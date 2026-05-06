@@ -299,6 +299,102 @@ describe('runPipeline', () => {
     expect(result.outcome).toBe('partial');
   });
 
+  it('Firefox mobile bookmark stays in mobile and does NOT duplicate to unfiled', async () => {
+    // Regression: previously projectForBrowser rerouted mobile bookmarks to
+    // unfiled even when the target was the source, creating a writable
+    // duplicate next to the read-only original.
+    const mobileBm = bookmark({
+      urlNormalized: 'https://m/',
+      title: 'Mobile-only',
+      folderPath: '/synchronisiert',
+      rootKey: 'mobile',
+    });
+    const cloud = createFakeCloud();
+    const drivers = [
+      createFakeDriver({ browserId: 'firefox', initialBookmarks: [mobileBm] }),
+    ];
+
+    await runPipeline({
+      userId: 'user-1',
+      cloud,
+      drivers,
+      logStore: createLogStore(tmpDir),
+      triggeredBy: 'manual',
+    });
+
+    // The saved snapshot should still contain the mobile bookmark
+    // (composed snapshot includes read-only-root content from the just-read).
+    const saved = cloud.savedSnapshots.find((s) => s.browserId === 'firefox');
+    expect(saved).toBeDefined();
+    const titles = saved!.snapshot.bookmarks.map((b) => b.title).sort();
+    expect(titles).toEqual(['Mobile-only']);
+    // And specifically that bookmark must be in mobile, not unfiled.
+    const persisted = saved!.snapshot.bookmarks[0];
+    expect(persisted.rootKey).toBe('mobile');
+    expect(persisted.folderPath).toBe('/synchronisiert');
+  });
+
+  it('Firefox mobile bookmark propagates to Safari as unfiled (no Safari mobile-root)', async () => {
+    // Regression: previously projectForBrowser kept rootKey=mobile when
+    // routing to Safari, but Safari has no mobile root, so the bookmark
+    // was silently dropped by the adapter.
+    const mobileBm = bookmark({
+      urlNormalized: 'https://m/',
+      title: 'Cross',
+      folderPath: '/synchronisiert',
+      rootKey: 'mobile',
+    });
+    const cloud = createFakeCloud();
+    const drivers = [
+      createFakeDriver({ browserId: 'firefox', initialBookmarks: [mobileBm] }),
+      createFakeDriver({ browserId: 'safari', initialBookmarks: [] }),
+    ];
+
+    await runPipeline({
+      userId: 'user-1',
+      cloud,
+      drivers,
+      logStore: createLogStore(tmpDir),
+      triggeredBy: 'manual',
+    });
+
+    const safariSnap = cloud.savedSnapshots.find((s) => s.browserId === 'safari');
+    expect(safariSnap).toBeDefined();
+    const safariBookmarks = safariSnap!.snapshot.bookmarks;
+    expect(safariBookmarks.length).toBe(1);
+    expect(safariBookmarks[0].title).toBe('Cross');
+    expect(safariBookmarks[0].rootKey).toBe('unfiled');
+    expect(safariBookmarks[0].folderPath).toBe('/andere-lesezeichen');
+  });
+
+  it('Firefox mobile bookmark propagates to Chrome as unfiled (Chrome synced is read-only and Chrome has no native copy)', async () => {
+    const mobileBm = bookmark({
+      urlNormalized: 'https://m/',
+      title: 'Cross-Chrome',
+      folderPath: '/synchronisiert',
+      rootKey: 'mobile',
+    });
+    const cloud = createFakeCloud();
+    const drivers = [
+      createFakeDriver({ browserId: 'firefox', initialBookmarks: [mobileBm] }),
+      createFakeDriver({ browserId: 'chrome', initialBookmarks: [] }),
+    ];
+
+    await runPipeline({
+      userId: 'user-1',
+      cloud,
+      drivers,
+      logStore: createLogStore(tmpDir),
+      triggeredBy: 'manual',
+    });
+
+    const chromeSnap = cloud.savedSnapshots.find((s) => s.browserId === 'chrome');
+    expect(chromeSnap).toBeDefined();
+    const chromeBookmarks = chromeSnap!.snapshot.bookmarks;
+    expect(chromeBookmarks.length).toBe(1);
+    expect(chromeBookmarks[0].rootKey).toBe('unfiled');
+  });
+
   it('Skipped run when no browsers are eligible', async () => {
     const ineligibleDriver: BrowserDriver = {
       browserId: 'firefox',

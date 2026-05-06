@@ -1,8 +1,8 @@
 # PROJ-6: Sync-Engine
 
-## Status: In Progress
+## Status: In Review
 **Created:** 2026-05-06
-**Last Updated:** 2026-05-06 (Backend gebaut, ready for QA)
+**Last Updated:** 2026-05-07 (QA Pre-Migration Pass, 2 HIGH-Bugs gefixt, Live-Sync-Addendum offen)
 
 ## Dependencies
 - PROJ-2 (Supabase Backend) für Cloud-State-Persistenz
@@ -356,7 +356,32 @@ runSync()
 **Live-Verifikation:** noch nicht möglich, da `0002_sync_engine.sql` noch nicht in Supabase ausgeführt wurde. Folgt mit `/qa PROJ-6` über `npm run build` und Live-Sync gegen die echten Browser.
 
 ## QA Test Results
-_To be added by /qa_
+
+**Datum:** 2026-05-07
+**Tier:** Standard (Pre-Migration Pass)
+**Health Score:** 92/100
+**Bericht:** `.gstack/qa-reports/qa-report-junction-PROJ-6-2026-05-07.md`
+
+**Resultat:**
+
+- 27/29 Acceptance Criteria offline verifiziert (2 live-only: Performance, echte 3-Browser-Sync-Verifikation)
+- 53 neue Engine-Tests grün, gesamt 179/179
+- 2 HIGH-Bugs gefunden und gefixt während QA, 3 Regressionstests dazu
+- 1 Low-Severity-Defense-in-Depth-Befund (akzeptiert)
+
+**Issues:**
+
+- **ISSUE-001 (HIGH, fixed):** Mobile-Bookmark wird im Origin-Browser dupliziert — Routing-Logik routete auch dann zu unfiled, wenn das Bookmark schon im read-only Mobile-Root des Targets war. Fix: `BROWSER_ROOT_SUPPORT`-Map mit writable+readOnly Sets pro Browser, plus drei-Aktion-Routing (`keep`/`skip`/`reroute`) und `composeSavedSnapshot` für korrekten Snapshot-State nach Write.
+- **ISSUE-002 (HIGH, fixed):** Mobile-Bookmarks gingen bei Safari-Propagation verloren — Safari hat keinen Mobile-Root, alte Logik liess `rootKey='mobile'` durch und der Adapter droppte das Bookmark stillschweigend. Selber Fix wie ISSUE-001 löst beides.
+- **ISSUE-003 (Low, accepted):** browserId-Whitelist greift nur bei Driver-Konstruktion, nicht bei jedem Adapter-Call — Defense-in-Depth-Marginalie, in der Praxis sicher.
+
+**Pending — Live-Sync-Addendum nach Migration:**
+
+- Initial-Sync gegen echte Cloud (Login + Trigger via Bridge)
+- Round-Trip Read→Write→Read mit echten Browser-Profilen
+- 3-Browser-Sync-Verifikation
+- Konflikt-Provokation und Konflikt-Log-Verifikation
+- Performance-Test 1'000 Bookmarks in <10s
 
 ## Deployment
 _To be added by /deploy_

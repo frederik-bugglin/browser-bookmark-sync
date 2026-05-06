@@ -5,7 +5,7 @@ import { diffBrowserSnapshot, indexByHash } from './diff';
 import { hashOf } from './identity';
 import { writeRunLog, type LogStore } from './log';
 import { resolve as resolveChanges } from './resolve';
-import { projectForBrowser } from './route';
+import { isReadOnlyRoot, projectForBrowser } from './route';
 import type { BrowserDriver } from './drivers';
 import type {
   AdapterPhaseLog,
@@ -125,14 +125,20 @@ export async function runPipeline(deps: PipelineDeps): Promise<SyncRunResult> {
   }
 
   // The merged cloud state, used to project per-browser snapshots in WRITE.
-  const mergedCloud = computeMergedCloud(cloudRows, resolved);
+  // We index by hash and carry source_browsers so projection can decide whether
+  // a target browser already holds a hash natively (read-only root) and skip it.
+  const { mergedByHash, sourcesByHash } = computeMergedCloud(cloudRows, resolved, currentByBrowser);
 
   // -------- Phase 6: WRITE ADAPTERS --------
   const writeOk = new Set<BrowserId>();
   for (const browserPlan of readableBrowsers) {
     const driver = findDriver(deps.drivers, browserPlan.browserId);
     if (!driver) continue;
-    const targetSnapshot = projectSnapshotFor(driver.browserId, mergedCloud);
+    const targetSnapshot = projectSnapshotFor(
+      driver.browserId,
+      mergedByHash,
+      sourcesByHash,
+    );
     const t0 = Date.now();
     try {
       driver.write(targetSnapshot);
@@ -166,7 +172,7 @@ export async function runPipeline(deps: PipelineDeps): Promise<SyncRunResult> {
       try {
         const reread = safariDriver.reread();
         const dt = Date.now() - t0;
-        const expected = projectSnapshotFor('safari', mergedCloud);
+        const expected = projectSnapshotFor('safari', mergedByHash, sourcesByHash);
         const expectedHashes = new Set(expected.bookmarks.map((b) => hashOf(b)));
         const actualHashes = new Set(reread.bookmarks.map((b) => hashOf(b)));
         const matches =
@@ -198,13 +204,20 @@ export async function runPipeline(deps: PipelineDeps): Promise<SyncRunResult> {
   }
 
   // -------- Phase 8: PERSIST SNAPSHOTS --------
+  // The persisted snapshot has to match the *actual* state of the browser
+  // after our write -- which is the projected snapshot for writable roots
+  // PLUS the read-only-root content from the just-read snapshot (untouched
+  // by our adapter). Otherwise the next sync's diff would falsely flag the
+  // read-only bookmarks as new and propagate them again.
   for (const browserId of writeOk) {
-    const targetSnapshot = projectSnapshotFor(browserId, mergedCloud);
+    const projected = projectSnapshotFor(browserId, mergedByHash, sourcesByHash);
+    const justRead = currentSnapshots.get(browserId);
+    const composed = composeSavedSnapshot(browserId, projected, justRead);
     try {
       await deps.cloud.saveSnapshot({
         userId: deps.userId,
         browserId: assertBrowserId(browserId),
-        snapshot: targetSnapshot,
+        snapshot: composed,
         syncRunId: runId,
       });
     } catch (err) {
@@ -258,18 +271,26 @@ function findDriver(drivers: BrowserDriver[], browserId: BrowserId): BrowserDriv
 }
 
 // Apply the resolved upserts/deletes onto the cloud rows snapshot to get the
-// merged state for the WRITE phase. We don't re-fetch from Supabase because
-// we already know exactly what we just wrote.
+// merged state for the WRITE phase. Returns both the bookmark map and a
+// per-hash source_browsers map (carried into projection so we can skip
+// bookmarks the target already holds natively in a read-only root).
 function computeMergedCloud(
   before: import('./types').CloudBookmark[],
   resolved: ReturnType<typeof resolveChanges>,
-): NormalizedBookmark[] {
-  const merged = new Map<string, NormalizedBookmark>();
+  currentByBrowser: Map<BrowserId, Map<string, NormalizedBookmark>>,
+): {
+  mergedByHash: Map<string, NormalizedBookmark>;
+  sourcesByHash: Map<string, readonly string[]>;
+} {
+  const mergedByHash = new Map<string, NormalizedBookmark>();
+  const sourcesByHash = new Map<string, readonly string[]>();
+
   for (const row of before) {
-    merged.set(row.bookmark_hash, cloudToNormalized(row));
+    mergedByHash.set(row.bookmark_hash, cloudToNormalized(row));
+    sourcesByHash.set(row.bookmark_hash, row.source_browsers);
   }
   for (const u of resolved.upserts) {
-    merged.set(u.bookmark_hash, {
+    mergedByHash.set(u.bookmark_hash, {
       id: u.bookmark_hash,
       url: u.url,
       urlNormalized: u.url_normalized,
@@ -279,25 +300,72 @@ function computeMergedCloud(
       dateAdded: u.date_added,
       dateModified: u.date_modified,
     });
+    sourcesByHash.set(u.bookmark_hash, u.source_browsers);
   }
   for (const hash of resolved.deletes) {
-    merged.delete(hash);
+    mergedByHash.delete(hash);
+    sourcesByHash.delete(hash);
   }
-  return Array.from(merged.values());
+
+  // Patch source_browsers from the just-read maps: a hash is "currently in
+  // browser B" iff B's current snapshot contains it. This lets read-only-root
+  // bookmarks register their true origin even if the cloud row's source_
+  // browsers was stale.
+  for (const hash of mergedByHash.keys()) {
+    const sources: string[] = [];
+    for (const [browserId, bookmarks] of currentByBrowser) {
+      if (bookmarks.has(hash)) sources.push(browserId);
+    }
+    if (sources.length > 0) sourcesByHash.set(hash, sources.sort());
+  }
+
+  return { mergedByHash, sourcesByHash };
 }
 
 // Project the merged cloud state into a snapshot suitable for one specific
-// target browser. Read-only-root bookmarks get rerouted into unfiled, the
-// rest stay as-is.
+// target browser. Bookmarks that the target already holds natively in a
+// read-only root are SKIPPED (avoids duplicates). Bookmarks whose rootKey
+// the target does not support are rerouted to unfiled.
 function projectSnapshotFor(
   browserId: BrowserId,
-  merged: NormalizedBookmark[],
+  mergedByHash: Map<string, NormalizedBookmark>,
+  sourcesByHash: Map<string, readonly string[]>,
 ): NormalizedSnapshot {
-  const bookmarks = merged.map((b) => projectForBrowser(b, browserId));
+  const bookmarks: NormalizedBookmark[] = [];
+  for (const [hash, b] of mergedByHash) {
+    const sources = sourcesByHash.get(hash) ?? [];
+    const projected = projectForBrowser(b, browserId, sources);
+    if (projected !== null) bookmarks.push(projected);
+  }
   return {
     browserId,
     folders: synthesizeFoldersFrom(bookmarks),
     bookmarks,
+  };
+}
+
+// Compose the snapshot we persist as the next "last-known-snapshot" for one
+// browser. Browser's actual on-disk state after our write =
+//   projected (writable roots, just rebuilt by the adapter) +
+//   read-only-root content from the just-read snapshot (the adapter never
+//   touched these).
+function composeSavedSnapshot(
+  browserId: BrowserId,
+  projected: NormalizedSnapshot,
+  justRead: NormalizedSnapshot | undefined,
+): NormalizedSnapshot {
+  if (!justRead) return projected;
+  const readOnlyBookmarks = justRead.bookmarks.filter((b) =>
+    isReadOnlyRoot(browserId, b.rootKey),
+  );
+  if (readOnlyBookmarks.length === 0) return projected;
+  const readOnlyFolders = justRead.folders.filter((f) =>
+    isReadOnlyRoot(browserId, f.rootKey),
+  );
+  return {
+    browserId: projected.browserId,
+    folders: [...projected.folders, ...readOnlyFolders],
+    bookmarks: [...projected.bookmarks, ...readOnlyBookmarks],
   };
 }
 
