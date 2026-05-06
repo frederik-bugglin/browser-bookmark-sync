@@ -6,6 +6,7 @@ import type { WindowManager } from './windows';
 import { configureAutoLaunch } from './autolaunch';
 import type { AuthService, AuthStatus } from './auth';
 import type { PermissionsService, PermissionsState } from './permissions';
+import type { SyncService, SyncState } from './sync';
 
 type Deps = {
   appStateStore: JsonStore<AppState>;
@@ -13,10 +14,11 @@ type Deps = {
   windows: WindowManager;
   auth: AuthService;
   permissions: PermissionsService;
+  sync: SyncService;
   getAllWindows: () => BrowserWindow[];
 };
 
-export function registerIpcHandlers({ appStateStore, settingsStore, windows, auth, permissions, getAllWindows }: Deps): void {
+export function registerIpcHandlers({ appStateStore, settingsStore, windows, auth, permissions, sync, getAllWindows }: Deps): void {
   ipcMain.handle('app:state:get', () => appStateStore.get());
 
   ipcMain.handle('app:state:set', (_e, patch: unknown) => {
@@ -62,6 +64,15 @@ export function registerIpcHandlers({ appStateStore, settingsStore, windows, aut
   ipcMain.handle('permissions:probe-safari', () => permissions.probeSafari());
   ipcMain.handle('permissions:open-safari-settings', () => permissions.openSafariSettings());
 
+  ipcMain.handle('sync:state:get', () => sync.getState());
+  ipcMain.handle('sync:run', async (_e, triggeredBy: unknown) => {
+    const allowed = ['manual', 'auto', 'restore'] as const;
+    const t = typeof triggeredBy === 'string' && (allowed as readonly string[]).includes(triggeredBy)
+      ? (triggeredBy as 'manual' | 'auto' | 'restore')
+      : 'manual';
+    return sync.run(t);
+  });
+
   appStateStore.on('change', (state: AppState) => {
     for (const win of getAllWindows()) {
       if (!win.isDestroyed()) win.webContents.send('app:state:changed', state);
@@ -83,6 +94,12 @@ export function registerIpcHandlers({ appStateStore, settingsStore, windows, aut
   permissions.on('change', (state: PermissionsState) => {
     for (const win of getAllWindows()) {
       if (!win.isDestroyed()) win.webContents.send('permissions:state:changed', state);
+    }
+  });
+
+  sync.on('change', (state: SyncState) => {
+    for (const win of getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send('sync:state:changed', state);
     }
   });
 }

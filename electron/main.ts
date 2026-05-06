@@ -8,6 +8,13 @@ import { configureAutoLaunch } from './autolaunch';
 import { tryLoadConfig } from './config';
 import { AuthService } from './auth';
 import { PermissionsService } from './permissions';
+import {
+  SyncEngine,
+  createLogStore,
+  createRealDrivers,
+  createSupabaseCloudClient,
+} from './sync-engine';
+import { SyncService } from './sync';
 
 const PROTOCOL = 'junction';
 let pendingDeepLink: string | null = null;
@@ -77,6 +84,13 @@ async function boot(): Promise<void> {
   // before any UI requests it. The probe is synchronous and <1 ms.
   permissionsService.probeSafari();
 
+  const syncEngine = new SyncEngine({
+    cloud: createSupabaseCloudClient(authService.getClient()),
+    drivers: createRealDrivers({ userDataDir: app.getPath('userData') }),
+    logStore: createLogStore(app.getPath('userData')),
+  });
+  const syncService = new SyncService(syncEngine, authService);
+
   const windows = new WindowManager(appStateStore);
 
   registerIpcHandlers({
@@ -85,6 +99,7 @@ async function boot(): Promise<void> {
     windows,
     auth: authService,
     permissions: permissionsService,
+    sync: syncService,
     getAllWindows: () => BrowserWindow.getAllWindows(),
   });
 

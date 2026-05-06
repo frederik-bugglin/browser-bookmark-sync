@@ -5,6 +5,8 @@ import type {
   PermissionStatus,
   PermissionsState,
   Settings,
+  SyncEngineState,
+  SyncRunSummary,
 } from './types';
 
 type Bridge = {
@@ -34,6 +36,13 @@ type Bridge = {
     probeSafari: () => Promise<PermissionStatus>;
     openSafariSettings: () => Promise<void>;
     subscribe: (listener: (state: PermissionsState) => void) => () => void;
+  };
+  sync: {
+    getState: () => Promise<SyncEngineState>;
+    run: (
+      triggeredBy: 'manual' | 'auto' | 'restore',
+    ) => Promise<{ runId: string; outcome: SyncRunSummary['outcome']; log: SyncRunSummary }>;
+    subscribe: (listener: (state: SyncEngineState) => void) => () => void;
   };
   app: {
     quit: () => Promise<void>;
@@ -65,15 +74,22 @@ const FALLBACK_PERMISSIONS: PermissionsState = {
   safari: 'unknown',
 };
 
+const FALLBACK_SYNC_STATE: SyncEngineState = {
+  isRunning: false,
+  lastResult: null,
+};
+
 function createMockBridge(): Bridge {
   let appState = { ...FALLBACK_APP_STATE };
   let settings = { ...FALLBACK_SETTINGS };
   let authStatus: AuthStatus = { state: 'unauthenticated' };
   let permissions: PermissionsState = { ...FALLBACK_PERMISSIONS };
+  let syncState: SyncEngineState = { ...FALLBACK_SYNC_STATE };
   const appStateListeners = new Set<(s: AppState) => void>();
   const settingsListeners = new Set<(s: Settings) => void>();
   const authListeners = new Set<(s: AuthStatus) => void>();
   const permissionListeners = new Set<(s: PermissionsState) => void>();
+  const syncListeners = new Set<(s: SyncEngineState) => void>();
   // First probe in the mock returns 'denied' (simulates the typical first-run
   // state). Each "I granted it" press flips to 'granted'.
   let mockSafariProbeCount = 0;
@@ -152,6 +168,29 @@ function createMockBridge(): Bridge {
       subscribe: (l) => {
         permissionListeners.add(l);
         return () => permissionListeners.delete(l);
+      },
+    },
+    sync: {
+      getState: async () => syncState,
+      run: async (triggeredBy) => {
+        // Mock-Run: tut nichts, gibt aber einen plausiblen Erfolgs-Result zurück.
+        const runId = `mock-${Date.now()}`;
+        const log: SyncRunSummary = {
+          runId,
+          outcome: 'success',
+          durationMs: 350,
+          conflictsWritten: 0,
+          cloudBookmarksUpserted: 0,
+          cloudBookmarksDeleted: 0,
+          errors: [],
+        };
+        syncState = { isRunning: false, lastResult: { runId, outcome: 'success', log } };
+        syncListeners.forEach((l) => l(syncState));
+        return { runId, outcome: 'success', log };
+      },
+      subscribe: (l) => {
+        syncListeners.add(l);
+        return () => syncListeners.delete(l);
       },
     },
     app: {

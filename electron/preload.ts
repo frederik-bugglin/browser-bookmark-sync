@@ -2,6 +2,8 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type { AppState, Settings } from './state';
 import type { AuthStatus } from './auth';
 import type { PermissionStatus, PermissionsState } from './permissions';
+import type { SyncState } from './sync';
+import type { SyncRunResult } from './sync-engine';
 
 export type AuthRequestResult = { ok: true } | { ok: false; message: string };
 
@@ -32,6 +34,11 @@ export type JunctionBridge = {
     probeSafari: () => Promise<PermissionStatus>;
     openSafariSettings: () => Promise<void>;
     subscribe: (listener: (state: PermissionsState) => void) => () => void;
+  };
+  sync: {
+    getState: () => Promise<SyncState>;
+    run: (triggeredBy: 'manual' | 'auto' | 'restore') => Promise<SyncRunResult>;
+    subscribe: (listener: (state: SyncState) => void) => () => void;
   };
   app: {
     quit: () => Promise<void>;
@@ -82,6 +89,15 @@ const bridge: JunctionBridge = {
       const handler = (_: unknown, state: PermissionsState) => listener(state);
       ipcRenderer.on('permissions:state:changed', handler);
       return () => ipcRenderer.removeListener('permissions:state:changed', handler);
+    },
+  },
+  sync: {
+    getState: () => ipcRenderer.invoke('sync:state:get'),
+    run: (triggeredBy) => ipcRenderer.invoke('sync:run', triggeredBy),
+    subscribe: (listener) => {
+      const handler = (_: unknown, state: SyncState) => listener(state);
+      ipcRenderer.on('sync:state:changed', handler);
+      return () => ipcRenderer.removeListener('sync:state:changed', handler);
     },
   },
   app: {

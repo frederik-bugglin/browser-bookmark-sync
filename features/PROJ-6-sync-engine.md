@@ -1,8 +1,8 @@
 # PROJ-6: Sync-Engine
 
-## Status: Architected
+## Status: In Progress
 **Created:** 2026-05-06
-**Last Updated:** 2026-05-06 (Tech Design via /architecture)
+**Last Updated:** 2026-05-06 (Backend gebaut, ready for QA)
 
 ## Dependencies
 - PROJ-2 (Supabase Backend) für Cloud-State-Persistenz
@@ -305,6 +305,55 @@ runSync()
 2. **Browser-Aktivierung-Schalter** — die Engine entscheidet "eligible" anhand `installed + permission + activated`. Wer setzt `activated`? Settings-UI in PROJ-8. MVP-Default: alle installierten + permitted Browser sind aktiviert
 3. **Konflikt-Log-Schema** — definiert PROJ-9. Engine schreibt nur Inserts. Wenn PROJ-9 das Schema noch nicht final hat, blocken wir den Engine-Build nicht — Engine kann gegen ein Stub-Schema arbeiten und die Felder anpassen, wenn PROJ-9 final ist
 4. **Initial-Sync-UX** — wenn der User auf `bookmark_snapshots`-empty läuft und alle Browser zusammen 10'000 Bookmarks haben, ist der erste Sync gross. Soll das ein expliziter "First-Run-Modus" mit Progress-UI sein? PROJ-7-Sync-Trigger entscheidet das in seiner Spec
+
+## Implementation Notes (Backend)
+
+**Engine komplett gebaut, 46 neue Tests grün, gesamt 172/172.**
+
+**Schema-Strategie (entschieden via /backend):** Drop+sauber neu. PROJ-2-Tabellen (`bookmarks`, `folders`, `conflict_log`) waren Scaffolding ohne Daten und werden in der neuen Migration `0002_sync_engine.sql` gedroppt. Drei neue Tabellen: `bookmarks_cloud` (flat hash-keyed), `bookmark_snapshots` (per-Browser Last-Known), `conflict_log` (PROJ-9-Schema mit Status `open`/`restored`/`dismissed`).
+
+**Files (Backend, Engine):**
+- `electron/sync-engine/types.ts` — `RootKey`, `BrowserId`, `NormalizedSnapshot`, `BookmarkChange`, `BrowserPlan`, `SyncRunLog`, `SyncRunResult`, `SyncEngineError`
+- `electron/sync-engine/browser-id.ts` — Whitelist (`safari`/`firefox`/`zen`/`chrome`/`arc`/`brave`/`edge`/`dia`), schliesst Path-Traversal-Defense-in-Depth aus PROJ-3/4/5 QA
+- `electron/sync-engine/identity.ts` — SHA-256[:32] Hash über `urlNormalized + folderPath + rootKey`
+- `electron/sync-engine/route.ts` — Read-Only-Root-Routing (Mobile/Synced → unfiled/`/andere-lesezeichen` im Ziel)
+- `electron/sync-engine/cloud.ts` — Supabase-Wrapper mit batched Upserts (max 500), `CloudClient`-Interface für Test-Mocks
+- `electron/sync-engine/log.ts` — Per-Run JSON-Telemetrie unter `<userData>/logs/sync-runs/<runId>.json`, FIFO max 100
+- `electron/sync-engine/diff.ts` — 3-Way-Diff per Browser (previous-Snapshot vs current liefert adds/updates/deletes)
+- `electron/sync-engine/resolve.ts` — LWW pro Bookmark mit Tie-Break alphabetisch nach `browserId`, Edit beats Delete (avoids silent edit loss), Source-Browsers-Tracking
+- `electron/sync-engine/drivers.ts` — Adapter-Facades pro Browser-Familie. Chromium-Driver übersetzt `bookmark_bar`/`other`/`synced` ↔ Engine-`toolbar`/`unfiled`/`mobile`. Safari-Driver liefert `reread()` für Race-Detection
+- `electron/sync-engine/pipeline.ts` — 9-Phasen-Orchestrator (Plan → Read → Diff → Resolve → Write Cloud → Write Adapter → Re-Read Safari → Persist Snapshots → Log)
+- `electron/sync-engine/index.ts` — Public API: `SyncEngine` Klasse, Factories `createSupabaseCloudClient`/`createRealDrivers`/`createLogStore`
+
+**Files (Backend, IPC):**
+- `electron/sync.ts` — `SyncService` (EventEmitter): integriert AuthService, blockt Sync ohne Session, emittiert State-Events
+- `electron/ipc.ts` — neue Handler `sync:state:get`, `sync:run`, Push-Event `sync:state:changed`
+- `electron/preload.ts` — `sync`-Sub-Bridge (parallel zu auth/permissions)
+- `electron/main.ts` — Engine wird im Boot instanziiert, Drivers via `createRealDrivers()`, Cloud-Client via `auth.getClient()`
+
+**Files (Renderer):**
+- `src/lib/types.ts` — `SyncEngineState`, `SyncRunSummary`, `SyncRunOutcome`
+- `src/lib/electron-bridge.ts` — `sync.getState`/`run`/`subscribe` plus Mock-Implementation für Browser-Dev
+
+**Files (DB):**
+- `supabase/migrations/0002_sync_engine.sql` — drop+create. RLS owner-only auf allen Tabellen, Indexe pro PROJ-9-Architecture
+
+**Tests (46 neue, gesamt 172/172):**
+- `browser-id.test.ts` (6) — Whitelist + Path-Traversal-Reject
+- `identity.test.ts` (8) — Hash-Determinismus + Collision-Resistenz
+- `route.test.ts` (9) — Read-Only-Root pro Browser-Familie + Routing-Korrektheit
+- `diff.test.ts` (9) — Add/Update/Delete-Erkennung, Folder-Move = add+delete (kein Update)
+- `resolve.test.ts` (8) — LWW per dateModified, Safari-fallback, Edit-beats-Delete, 3-Way-Konflikt produziert 2 Log-Einträge
+- `pipeline.test.ts` (6) — End-to-End mit gemockten Drivers + Cloud, Initial-Sync, Idempotenz, Konflikt, Read-Failure-Partial, Safari-Race-Detection, Skipped-Run
+
+**Was bewusst NICHT gebaut:**
+- Keine Auto-Trigger oder Scheduler — PROJ-7 setzt das auf
+- Keine Konflikt-Log-UI — PROJ-9 baut das (Engine schreibt nur Inserts)
+- Keine Settings-UI für Browser-Aktivierung — PROJ-8 (MVP-Default: alle eligible werden synct)
+- Keine `markBookmarkForRestore()`-Helper-Funktion — wird mit PROJ-9-Backend ergänzt
+- Keine Migration für Schema-Versions-Aufstieg — Snapshots beim Schema-Change einfach gepurged
+
+**Live-Verifikation:** noch nicht möglich, da `0002_sync_engine.sql` noch nicht in Supabase ausgeführt wurde. Folgt mit `/qa PROJ-6` über `npm run build` und Live-Sync gegen die echten Browser.
 
 ## QA Test Results
 _To be added by /qa_

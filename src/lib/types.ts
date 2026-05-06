@@ -53,3 +53,23 @@ export type PermissionStatus =
 export type PermissionsState = {
   safari: PermissionStatus;
 };
+
+// Sync engine state mirrored from the main process. Keep in sync with
+// electron/sync.ts:SyncState and electron/sync-engine/types.ts:SyncRunResult.
+export type SyncRunOutcome = 'success' | 'partial' | 'error' | 'skipped';
+
+export type SyncRunSummary = {
+  runId: string;
+  outcome: SyncRunOutcome;
+  durationMs: number;
+  conflictsWritten: number;
+  cloudBookmarksUpserted: number;
+  cloudBookmarksDeleted: number;
+  errors: string[];
+  safariRaceSuspect?: boolean;
+};
+
+export type SyncEngineState = {
+  isRunning: boolean;
+  lastResult: { runId: string; outcome: SyncRunOutcome; log: SyncRunSummary } | null;
+};
