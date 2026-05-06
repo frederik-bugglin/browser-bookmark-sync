@@ -17,7 +17,7 @@
 | PROJ-1 | Electron-Shell und Menüleisten-App | Approved | [PROJ-1-electron-shell.md](PROJ-1-electron-shell.md) | 2026-05-06 |
 | PROJ-2 | Supabase Backend und Auth | Approved | [PROJ-2-supabase-backend.md](PROJ-2-supabase-backend.md) | 2026-05-06 |
 | PROJ-3 | Bookmark-Adapter Chromium-Familie | In Progress | [PROJ-3-adapter-chromium.md](PROJ-3-adapter-chromium.md) | 2026-05-06 |
-| PROJ-4 | Bookmark-Adapter Firefox und Zen | Planned | [PROJ-4-adapter-firefox.md](PROJ-4-adapter-firefox.md) | 2026-05-06 |
+| PROJ-4 | Bookmark-Adapter Firefox und Zen | In Progress | [PROJ-4-adapter-firefox.md](PROJ-4-adapter-firefox.md) | 2026-05-06 |
 | PROJ-5 | Bookmark-Adapter Safari | Planned | [PROJ-5-adapter-safari.md](PROJ-5-adapter-safari.md) | 2026-05-06 |
 | PROJ-6 | Sync-Engine | Planned | [PROJ-6-sync-engine.md](PROJ-6-sync-engine.md) | 2026-05-06 |
 | PROJ-7 | Sync-Trigger (manuell und automatisch) | Planned | [PROJ-7-sync-trigger.md](PROJ-7-sync-trigger.md) | 2026-05-06 |
