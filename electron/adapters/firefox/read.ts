@@ -135,7 +135,15 @@ function walk(
 }
 
 export function readBookmarks(placesPath: string, browserId: string): NormalizedSnapshot {
-  const { tmpFile, cleanup } = snapshotToTemp(placesPath);
+  let snap: { tmpFile: string; cleanup: () => void };
+  try {
+    snap = snapshotToTemp(placesPath);
+  } catch (err) {
+    // Wrap copy failures (missing file, permission denied) so callers see a
+    // consistent error type from the adapter.
+    throw new FirefoxParseError(browserId, err);
+  }
+  const { tmpFile, cleanup } = snap;
   let db: DatabaseSync | null = null;
   try {
     db = new DatabaseSync(tmpFile, { readOnly: true });

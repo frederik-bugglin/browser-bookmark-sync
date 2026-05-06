@@ -1,11 +1,12 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { buildFixtureDb, type FixtureBookmark } from './__fixtures__/build-fixture';
 import { readBookmarks } from './read';
+import { FirefoxParseError } from './types';
 
 describe('readBookmarks', () => {
   let tmpDir: string;
@@ -101,6 +102,18 @@ describe('readBookmarks', () => {
 
     const snapshot = readBookmarks(dbPath, 'firefox');
     expect(snapshot.bookmarks.find((b) => b.url.includes('tagged'))).toBeUndefined();
+  });
+
+  it('wraps missing-file errors in FirefoxParseError', () => {
+    expect(() => readBookmarks(path.join(tmpDir, 'does-not-exist.sqlite'), 'firefox')).toThrow(
+      FirefoxParseError,
+    );
+  });
+
+  it('wraps corrupt-file errors in FirefoxParseError', () => {
+    const garbage = path.join(tmpDir, 'garbage.sqlite');
+    writeFileSync(garbage, 'not a sqlite file at all');
+    expect(() => readBookmarks(garbage, 'firefox')).toThrow(FirefoxParseError);
   });
 
   it('normalises URLs with tracking parameters', () => {
