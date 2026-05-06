@@ -1,8 +1,8 @@
 # PROJ-6: Sync-Engine
 
-## Status: Planned
+## Status: Architected
 **Created:** 2026-05-06
-**Last Updated:** 2026-05-06 (Refined via /requirements)
+**Last Updated:** 2026-05-06 (Tech Design via /architecture)
 
 ## Dependencies
 - PROJ-2 (Supabase Backend) für Cloud-State-Persistenz
@@ -110,7 +110,201 @@
 <!-- Sections below are added by subsequent skills -->
 
 ## Tech Design (Solution Architect)
-_To be added by /architecture_
+
+### Wo lebt die Engine
+
+Die Sync-Engine ist Teil des Electron-Main-Prozesses, ein neues Modul `electron/sync-engine/` parallel zu `electron/adapters/`. Die Engine ruft die Adapter direkt als TypeScript-Funktionen auf, weil beide im selben Prozess laufen. Kein IPC, keine Worker-Threads für MVP.
+
+Sync-Trigger (PROJ-7) wird die Engine später per `runSync()` von aussen anstossen — die Engine selbst kennt keine Scheduler oder Buttons.
+
+### Komponenten-Struktur
+
+```
+electron/sync-engine/
++-- index.ts             // Public API: runSync(), getLastRunStatus()
++-- pipeline.ts          // Orchestriert die 9 Phasen einer Sync-Run
++-- identity.ts          // SHA-256-Hash über urlNormalized + folderPath + rootKey
++-- diff.ts              // 3-Way-Diff pro Browser
++-- resolve.ts           // LWW-Konfliktauflösung
++-- route.ts             // Cross-Browser-Routing (Mobile/Synced -> unfiled/other)
++-- cloud.ts             // Supabase-Reads/Writes (Bookmarks, Snapshots)
++-- snapshot.ts          // Last-Known-Snapshot speichern/laden
++-- log.ts               // Sync-Run-Telemetrie auf Disk
++-- browser-id.ts        // Whitelist-Validation vor jedem Adapter-Aufruf
++-- types.ts             // SyncRun, SyncResult, BookmarkChange, ...
+```
+
+Adapter werden **nicht** angefasst — die Engine konsumiert sie nur über deren bestehende Public APIs (`detectAll`, `readBookmarks`, `writeBookmarks`).
+
+### Datenmodell (Plain Language)
+
+**Cloud (Supabase, RLS owner-only):**
+
+| Tabelle | Inhalt | Lebensdauer |
+|---|---|---|
+| `bookmarks_cloud` | Der gemerged-te Stand aller Bookmarks dieses Users. Pro Eintrag: ein Identitäts-Hash, die URL, der normalisierte Pfad, der Titel, welche Browser ihn aktuell führen, der `updated_at`-Timestamp. | Permanent |
+| `bookmark_snapshots` | Pro `(user, browser)` genau ein Eintrag: der letzte erfolgreich synchronisierte Stand dieses Browsers als JSON. Wird beim nächsten erfolgreichen Sync ersetzt. | Permanent (eine Zeile pro Browser) |
+| `conflict_log` | Definiert in PROJ-9. Engine schreibt nur Inserts. | Permanent (Retention in PROJ-9) |
+
+**Lokal (Dateisystem im Electron-userData):**
+
+| Pfad | Inhalt | Lebensdauer |
+|---|---|---|
+| `<userData>/logs/sync-runs/<runId>.json` | Telemetrie eines einzelnen Sync-Laufs: Dauer pro Phase, Counts pro Adapter, Konflikt-Anzahl, Fehler. | FIFO-Rotation, max 100 Läufe |
+| `<userData>/backups/<browser>/<browserId>/...` | Adapter-Backups (existieren bereits aus PROJ-3/4/5). Engine fasst sie nicht an, nur die Adapter rotieren. | Max 3 pro Browser-Profil |
+
+**Was ein Last-Known-Snapshot enthält:** alle Folders und Bookmarks, die der Adapter beim letzten erfolgreichen Read produziert hat — also die normalisierte Form (URL, Titel, Pfad, Root, optional `dateModified`). Keine zusätzlichen Engine-Metadaten.
+
+### Sync-Run-Pipeline
+
+```
+runSync()
++-- Phase 1: PLAN
+|   Welche Browser sind eligible? (installiert, Permission OK, vom User aktiviert)
+|
++-- Phase 2: READ (parallel pro Adapter)
+|   Jeder Adapter liefert einen NormalizedSnapshot.
+|   Browser läuft / Permission verweigert -> Browser wird übersprungen, Lauf weiter.
+|
++-- Phase 3: DIFF (sequenziell pro Browser)
+|   Für jeden Browser: 3-Way-Diff zwischen
+|     Last-Known-Snapshot (aus Cloud, vom letzten Lauf)
+|     Aktueller Snapshot (gerade gelesen)
+|     Aktueller Cloud-State (bookmarks_cloud)
+|   Output: Liste der Änderungen, die DIESER Browser seit letztem Sync gemacht hat.
+|
++-- Phase 4: RESOLVE
+|   Alle Per-Browser-Änderungen werden gesammelt und auf den Cloud-State angewendet.
+|   Bei Konflikten (zwei Browser haben dasselbe Bookmark unterschiedlich verändert):
+|     LWW pro Bookmark, dateModified entscheidet.
+|     Verlierende Version wird als Konflikt-Log-Eintrag vorgemerkt.
+|
++-- Phase 5: WRITE CLOUD (atomar pro Tabelle, batched)
+|   Cloud-Bookmarks-Tabelle wird aktualisiert (Upserts + Deletes).
+|   Konflikt-Log-Einträge werden inserted.
+|   ACHTUNG: Cloud wird VOR den Adaptern geschrieben (Begründung unten).
+|
++-- Phase 6: WRITE ADAPTERS (sequenziell, mit browserId-Whitelist)
+|   Pro eligible Browser: writeBookmarks(merged-snapshot).
+|   Read-Only-Roots werden NICHT befüllt mit Cross-Browser-Material -- siehe Routing.
+|   Wenn ein Adapter-Write fehlschlägt, läuft der nächste trotzdem (partial-success).
+|
++-- Phase 7: RE-READ SAFARI (nur wenn Safari geschrieben wurde)
+|   Liest Safari sofort erneut, vergleicht mit dem geschriebenen Stand.
+|   Wenn Diff: Safari hat parallel selber geschrieben (Race), Lauf wird als
+|   suspect markiert und beim nächsten Lauf re-merged.
+|
++-- Phase 8: PERSIST SNAPSHOTS
+|   Pro erfolgreich geschriebenem Browser: bookmark_snapshots-Eintrag
+|   wird mit dem just-written Stand überschrieben (UPSERT).
+|
++-- Phase 9: LOG
+|   Sync-Run-Telemetrie wird auf Disk geschrieben.
+|   Lauf-Status (success / partial / aborted) wird im AppState gespiegelt.
+```
+
+### Tech-Decisions (warum)
+
+#### 1. Cloud-zuerst, dann Adapter (nicht umgekehrt)
+
+**Warum:** Wenn die Engine zwischen den Phasen crasht, will man den am wenigsten schmerzhaften Recovery-Pfad. Cloud-zuerst bedeutet: bei Crash nach Phase 5 ist Cloud auf dem neuen Stand, Adapter noch alt. Beim nächsten Lauf sieht jeder Adapter sich selbst als veraltet, holt sich den Cloud-Stand und gut. **LWW heilt das automatisch.**
+
+Andersrum (Adapter zuerst): Crash nach Phase 6 würde Adapter auf neuem Stand und Cloud auf altem zurücklassen. Beim nächsten Lauf sieht die Engine die "neuen" Bookmarks in den Adaptern als User-Adds und propagiert sie nochmal nach Cloud. Kein Datenverlust, aber Konflikt-Log-Spam und doppelte Arbeit.
+
+**Tradeoff:** Wenn der User in der kurzen Lücke zwischen Cloud-Write und Adapter-Write in einem Browser schnell etwas ändert, kann diese Änderung beim Adapter-Write überschrieben werden. Die Mitigation ist die 5-min-Latenz im Auto-Modus plus die Re-Read-Phase für Safari.
+
+#### 2. Last-Known-Snapshots in Cloud, nicht lokal
+
+**Warum:** Der Snapshot ist die Wahrheit über "was hat dieser Browser zuletzt rausgeschickt". Wenn er lokal liegt und der User wechselt den Mac (Multi-Mac-ready laut PRD), wäre er weg. In Cloud ist er für jedes Junction-Device des Users verfügbar. Auch wenn MVP nur einen Mac syncht — die Architektur ist Multi-Mac-ready, die Speicher-Lokation muss konsistent sein.
+
+**Tradeoff:** Sync-Engine braucht zwingend Internet. Offline-Modus ist out-of-scope (laut PRD).
+
+#### 3. Nur der jüngste Snapshot pro `(user, browser)` wird gehalten
+
+**Warum:** Der 3-Way-Diff braucht nur den unmittelbaren Vorgänger. Ältere Snapshots haben keinen operativen Wert. Die Risiko-Notiz im Spec rechnete mit 750 MB Storage bei voller History — bei nur einem Snapshot pro Browser sind es ~1.5 MB für drei Browser mit je 5'000 Bookmarks. Vernachlässigbar.
+
+**Wenn man mal historische Snapshots will:** das Konflikt-Log (PROJ-9) hält die einzelnen Bookmark-Versionen nach Konflikt — das ist die historische Sicht, die der User wirklich braucht.
+
+#### 4. Identitäts-Hash inkludiert Folder-Pfad
+
+**Warum:** Konsistent mit dem Spec. Folder-Rename produziert dadurch viel Diff-Aktivität (alle Bookmarks darunter sehen "neu" aus). Das ist akzeptiert — Folder-Renames sind selten und der Sync-Engine läuft auf normalisierten Daten. **Phase-2-Mitigation:** Heuristik "wenn 80%+ der Bookmarks aus Folder X gleichzeitig in Folder Y wieder auftauchen, behandle als Folder-Move statt Mass-Add+Delete". Out-of-Scope für MVP.
+
+#### 5. Cross-Browser-Routing für Read-Only-Roots
+
+**Warum:** Bookmarks aus `synced` (Chromium) und `mobile` (Firefox) können NICHT zurück in dieselben Roots in den anderen Browsern geschrieben werden, weil die dort gar nicht existieren oder von Apple/Google verwaltet werden. Die Engine routet sie beim Cross-Browser-Propagation in den `unfiled`/`other`-Root des Ziel-Browsers — das ist dort der "weiche Mülleimer" für Ungeordnetes. Toolbar wäre falsch (da würde der User die nicht erwarten).
+
+**Konkret:**
+
+| Origin (read-only) | Ziel-Browser | Ziel-Root |
+|---|---|---|
+| Chromium `synced` | Firefox | `unfiled` (`/andere-lesezeichen`) |
+| Chromium `synced` | Safari | `unfiled` (`/andere-lesezeichen`) |
+| Firefox `mobile` | Chromium | `other` (`/andere-lesezeichen`) |
+| Firefox `mobile` | Safari | `unfiled` (`/andere-lesezeichen`) |
+| Safari (kein RO-Root) | -- | -- |
+
+Der Origin-Browser selbst behält die Bookmarks unverändert in seinem Read-Only-Root.
+
+#### 6. Engine läuft synchron-sequenziell, nicht parallel
+
+**Warum:** Drei Browser, ein Mac, jeder Sync braucht <10s laut Spec. Parallelisierung würde Race-Conditions (Adapter-Lock-Files, Backup-Rotation) einbringen ohne nennenswerten Geschwindigkeitsgewinn. Read-Phase könnte theoretisch parallel laufen — wir lassen das aber sequenziell, weil node:sqlite und simple-plist beide synchron sind und parallele File-IO auf SSD wenig bringt.
+
+**Phase-2-Optimierung:** wenn die Engine bei 50'000+ Bookmarks träge wird, kann man Read parallelisieren.
+
+#### 7. URL-Normalisierung über das bestehende Modul
+
+**Warum:** `electron/lib/url-normalize.ts` existiert schon und wird von allen Adaptern beim Read verwendet. Engine ruft dieselbe Funktion auf — keine zweite Wahrheit über "was ist die normalisierte URL".
+
+### Edge Cases (Architektur-Sicht)
+
+| Fall | Engine-Verhalten |
+|---|---|
+| Cloud nicht erreichbar | Phase 5 wirft, gesamter Lauf wird abgebrochen. Adapter werden nicht angefasst. AppState meldet `lastSyncStatus: 'error'`. |
+| Ein Adapter-Read schlägt fehl | Browser wird aus diesem Lauf rausgeworfen, andere laufen durch. Last-Known-Snapshot des betroffenen Browsers bleibt unangetastet, beim nächsten Lauf wird neu gemerged. |
+| Ein Adapter-Write schlägt fehl | Sync-Lauf ist `partial-success`. Cloud ist auf neuem Stand, der gecrashte Browser ist auf altem. Beim nächsten Lauf zieht die Engine den Browser per LWW wieder hoch. |
+| Safari-Write erfolgreich, aber Re-Read zeigt Diff | Safari hat parallel geschrieben. Lauf wird als `safari-race-suspect` markiert, beim nächsten Lauf wird Safari neu gemerged. Konflikt-Log enthält die Race-Notiz. |
+| Initial-Sync mit 0 Bookmarks irgendwo | Union ist leer, kein Konflikt. Snapshots werden trotzdem geschrieben (alle drei mit `[]`). |
+| Identitäts-Kollision (zwei verschiedene Bookmarks haben denselben Hash) | Theoretisch unmöglich bei SHA-256 + 32 Zeichen Prefix; falls doch (kosmischer Fehler), wird der erste Eintrag genommen, der zweite überschrieben. Akzeptiertes Risiko. |
+| Riesiger Snapshot (50'000+ Bookmarks pro Browser) | JSONB in Postgres hält bis 256 MB pro Wert; ~5 MB pro Snapshot bei 50k Bookmarks. Performance-Test in QA mit synthetischen Daten. |
+| Schemaversion ändert sich | Snapshots haben kein eigenes Schema-Feld in MVP. Bei Migration wird Snapshot-Tabelle gepurged und der nächste Sync startet als Initial-Sync (Union). Akzeptierter Reset. |
+
+### Dependencies (zu installieren)
+
+- `@supabase/supabase-js` — schon vorhanden aus PROJ-2
+- `node:crypto` — Built-in, kein npm-Package nötig
+- alle Adapter-Pakete schon vorhanden
+
+### Was diese Architektur explizit NICHT enthält
+
+- **Keine Worker-Threads** — Engine läuft im Main-Prozess, blockt UI für ein paar Sekunden bei grossen Syncs. Akzeptabel weil UI grösstenteils Tray-basiert
+- **Keine Edge-Function-Logik** auf Supabase-Seite — alles läuft im Electron-Client, Supabase ist nur Storage
+- **Kein Real-Time-Subscribe** auf Cloud-Änderungen — wir pollen via Trigger (PROJ-7) statt Push-Listening. Spart Verbindung-Komplexität, kostet 5-min-Latenz im Worst-Case
+- **Keine differenzielle Compression** der Snapshots — voller JSON-Snapshot pro Lauf, einfach und debugbar
+- **Kein Folder-Rename-Detector** — Phase-2-Heuristik
+- **Kein Test-Mode oder Dry-Run** — würde die Pipeline-Logik verdoppeln. User vertraut den Backups (Adapter haben Rotation)
+
+### Component-Tree für die Engine (intern)
+
+```
+runSync()
++-- pipeline.run()
+    +-- plan()                  -> EligibleBrowsers[]
+    +-- read(eligible)           -> Map<browserId, Snapshot>
+    +-- diff(current, lastKnown, cloud)  -> Per-Browser-Changes
+    +-- resolve(allChanges)      -> CloudActions + ConflictLogEntries
+    +-- writeCloud(actions, conflicts)
+    +-- writeAdapters(eligible, mergedState)
+    +-- reReadSafari(if-applicable)
+    +-- persistSnapshots(eligible)
+    +-- log(runResult)
+```
+
+### Risiken und offene Fragen für Implementation
+
+1. **Folder-Move-Heuristik** — out-of-scope für MVP, aber wenn der User selbst grosse Umstrukturierungen macht, wird der erste Sync danach laut. Sollte irgendwo dokumentiert sein, dass das normal ist
+2. **Browser-Aktivierung-Schalter** — die Engine entscheidet "eligible" anhand `installed + permission + activated`. Wer setzt `activated`? Settings-UI in PROJ-8. MVP-Default: alle installierten + permitted Browser sind aktiviert
+3. **Konflikt-Log-Schema** — definiert PROJ-9. Engine schreibt nur Inserts. Wenn PROJ-9 das Schema noch nicht final hat, blocken wir den Engine-Build nicht — Engine kann gegen ein Stub-Schema arbeiten und die Felder anpassen, wenn PROJ-9 final ist
+4. **Initial-Sync-UX** — wenn der User auf `bookmark_snapshots`-empty läuft und alle Browser zusammen 10'000 Bookmarks haben, ist der erste Sync gross. Soll das ein expliziter "First-Run-Modus" mit Progress-UI sein? PROJ-7-Sync-Trigger entscheidet das in seiner Spec
 
 ## QA Test Results
 _To be added by /qa_
