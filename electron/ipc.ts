@@ -5,16 +5,18 @@ import { AppStateSchema, SettingsSchema, type AppState, type Settings } from './
 import type { WindowManager } from './windows';
 import { configureAutoLaunch } from './autolaunch';
 import type { AuthService, AuthStatus } from './auth';
+import type { PermissionsService, PermissionsState } from './permissions';
 
 type Deps = {
   appStateStore: JsonStore<AppState>;
   settingsStore: JsonStore<Settings>;
   windows: WindowManager;
   auth: AuthService;
+  permissions: PermissionsService;
   getAllWindows: () => BrowserWindow[];
 };
 
-export function registerIpcHandlers({ appStateStore, settingsStore, windows, auth, getAllWindows }: Deps): void {
+export function registerIpcHandlers({ appStateStore, settingsStore, windows, auth, permissions, getAllWindows }: Deps): void {
   ipcMain.handle('app:state:get', () => appStateStore.get());
 
   ipcMain.handle('app:state:set', (_e, patch: unknown) => {
@@ -56,6 +58,10 @@ export function registerIpcHandlers({ appStateStore, settingsStore, windows, aut
     await auth.signOut();
   });
 
+  ipcMain.handle('permissions:state:get', () => permissions.getState());
+  ipcMain.handle('permissions:probe-safari', () => permissions.probeSafari());
+  ipcMain.handle('permissions:open-safari-settings', () => permissions.openSafariSettings());
+
   appStateStore.on('change', (state: AppState) => {
     for (const win of getAllWindows()) {
       if (!win.isDestroyed()) win.webContents.send('app:state:changed', state);
@@ -71,6 +77,12 @@ export function registerIpcHandlers({ appStateStore, settingsStore, windows, aut
   auth.on('change', (status: AuthStatus) => {
     for (const win of getAllWindows()) {
       if (!win.isDestroyed()) win.webContents.send('auth:status:changed', status);
+    }
+  });
+
+  permissions.on('change', (state: PermissionsState) => {
+    for (const win of getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send('permissions:state:changed', state);
     }
   });
 }

@@ -43,3 +43,13 @@ export type AuthStatus =
   | { state: 'authenticated'; email: string; userId: string };
 
 export type AuthRequestResult = { ok: true } | { ok: false; message: string };
+
+export type PermissionStatus =
+  | 'unknown'      // not yet probed this session
+  | 'granted'      // user has approved
+  | 'denied'       // probe returned EACCES (TCC blocking)
+  | 'unavailable'; // browser not installed / no profile / permission not applicable
+
+export type PermissionsState = {
+  safari: PermissionStatus;
+};

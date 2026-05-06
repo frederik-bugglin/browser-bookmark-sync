@@ -1,4 +1,11 @@
-import type { AppState, AuthRequestResult, AuthStatus, Settings } from './types';
+import type {
+  AppState,
+  AuthRequestResult,
+  AuthStatus,
+  PermissionStatus,
+  PermissionsState,
+  Settings,
+} from './types';
 
 type Bridge = {
   appState: {
@@ -21,6 +28,12 @@ type Bridge = {
     requestMagicLink: (email: string) => Promise<AuthRequestResult>;
     signOut: () => Promise<void>;
     subscribe: (listener: (status: AuthStatus) => void) => () => void;
+  };
+  permissions: {
+    getState: () => Promise<PermissionsState>;
+    probeSafari: () => Promise<PermissionStatus>;
+    openSafariSettings: () => Promise<void>;
+    subscribe: (listener: (state: PermissionsState) => void) => () => void;
   };
   app: {
     quit: () => Promise<void>;
@@ -48,13 +61,22 @@ const FALLBACK_SETTINGS: Settings = {
   autoLaunch: true,
 };
 
+const FALLBACK_PERMISSIONS: PermissionsState = {
+  safari: 'unknown',
+};
+
 function createMockBridge(): Bridge {
   let appState = { ...FALLBACK_APP_STATE };
   let settings = { ...FALLBACK_SETTINGS };
   let authStatus: AuthStatus = { state: 'unauthenticated' };
+  let permissions: PermissionsState = { ...FALLBACK_PERMISSIONS };
   const appStateListeners = new Set<(s: AppState) => void>();
   const settingsListeners = new Set<(s: Settings) => void>();
   const authListeners = new Set<(s: AuthStatus) => void>();
+  const permissionListeners = new Set<(s: PermissionsState) => void>();
+  // First probe in the mock returns 'denied' (simulates the typical first-run
+  // state). Each "I granted it" press flips to 'granted'.
+  let mockSafariProbeCount = 0;
 
   return {
     appState: {
@@ -104,6 +126,32 @@ function createMockBridge(): Bridge {
       subscribe: (l) => {
         authListeners.add(l);
         return () => authListeners.delete(l);
+      },
+    },
+    permissions: {
+      getState: async () => permissions,
+      probeSafari: async () => {
+        mockSafariProbeCount += 1;
+        // First probe -> denied (simulates fresh install). Subsequent probes
+        // (after the user pressed "Open System Settings" + "I granted it")
+        // flip to granted.
+        const next: PermissionStatus = mockSafariProbeCount === 1 ? 'denied' : 'granted';
+        permissions = { ...permissions, safari: next };
+        permissionListeners.forEach((l) => l(permissions));
+        return next;
+      },
+      openSafariSettings: async () => {
+        if (typeof window !== 'undefined') {
+          window.open(
+            'https://support.apple.com/de-ch/guide/mac-help/mh32356/mac',
+            '_blank',
+            'noopener',
+          );
+        }
+      },
+      subscribe: (l) => {
+        permissionListeners.add(l);
+        return () => permissionListeners.delete(l);
       },
     },
     app: {

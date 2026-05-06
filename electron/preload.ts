@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { AppState, Settings } from './state';
 import type { AuthStatus } from './auth';
+import type { PermissionStatus, PermissionsState } from './permissions';
 
 export type AuthRequestResult = { ok: true } | { ok: false; message: string };
 
@@ -25,6 +26,12 @@ export type JunctionBridge = {
     requestMagicLink: (email: string) => Promise<AuthRequestResult>;
     signOut: () => Promise<void>;
     subscribe: (listener: (status: AuthStatus) => void) => () => void;
+  };
+  permissions: {
+    getState: () => Promise<PermissionsState>;
+    probeSafari: () => Promise<PermissionStatus>;
+    openSafariSettings: () => Promise<void>;
+    subscribe: (listener: (state: PermissionsState) => void) => () => void;
   };
   app: {
     quit: () => Promise<void>;
@@ -65,6 +72,16 @@ const bridge: JunctionBridge = {
       const handler = (_: unknown, status: AuthStatus) => listener(status);
       ipcRenderer.on('auth:status:changed', handler);
       return () => ipcRenderer.removeListener('auth:status:changed', handler);
+    },
+  },
+  permissions: {
+    getState: () => ipcRenderer.invoke('permissions:state:get'),
+    probeSafari: () => ipcRenderer.invoke('permissions:probe-safari'),
+    openSafariSettings: () => ipcRenderer.invoke('permissions:open-safari-settings'),
+    subscribe: (listener) => {
+      const handler = (_: unknown, state: PermissionsState) => listener(state);
+      ipcRenderer.on('permissions:state:changed', handler);
+      return () => ipcRenderer.removeListener('permissions:state:changed', handler);
     },
   },
   app: {

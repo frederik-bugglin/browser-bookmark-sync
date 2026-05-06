@@ -7,6 +7,7 @@ import { registerIpcHandlers } from './ipc';
 import { configureAutoLaunch } from './autolaunch';
 import { tryLoadConfig } from './config';
 import { AuthService } from './auth';
+import { PermissionsService } from './permissions';
 
 const PROTOCOL = 'junction';
 let pendingDeepLink: string | null = null;
@@ -71,6 +72,11 @@ async function boot(): Promise<void> {
   authService = new AuthService(configResult.config);
   await authService.init();
 
+  const permissionsService = new PermissionsService();
+  // Probe at boot so the renderer's first state read reflects reality even
+  // before any UI requests it. The probe is synchronous and <1 ms.
+  permissionsService.probeSafari();
+
   const windows = new WindowManager(appStateStore);
 
   registerIpcHandlers({
@@ -78,6 +84,7 @@ async function boot(): Promise<void> {
     settingsStore,
     windows,
     auth: authService,
+    permissions: permissionsService,
     getAllWindows: () => BrowserWindow.getAllWindows(),
   });
 
