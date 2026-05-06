@@ -1,8 +1,8 @@
 # PROJ-3: Bookmark-Adapter Chromium-Familie
 
-## Status: In Progress
+## Status: Approved
 **Created:** 2026-05-06
-**Last Updated:** 2026-05-06
+**Last Updated:** 2026-05-06 (Status nachgezogen — Adapter ist im Einsatz und durch PROJ-4/5-QA implizit mitabgedeckt)
 
 ## Dependencies
 - None (kann unabhängig gebaut und getestet werden)
