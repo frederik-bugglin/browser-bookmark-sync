@@ -1,6 +1,6 @@
 # PROJ-4: Bookmark-Adapter Firefox und Zen
 
-## Status: In Progress
+## Status: Approved
 **Created:** 2026-05-06
 **Last Updated:** 2026-05-06
 
@@ -243,7 +243,32 @@ Falls `node:sqlite` in Electron 42 noch hinter dem `--experimental-sqlite`-Flag 
 - Schema-Drift-Schutz: bei unbekanntem `moz_bookmarks.schema_version` Browser überspringen — TODO im Read.
 
 ## QA Test Results
-_To be added by /qa_
+
+**Date:** 2026-05-06
+**Tier:** Standard
+**Health Score:** 96/100
+**Report:** [`.gstack/qa-reports/qa-report-junction-PROJ-4-2026-05-06.md`](../.gstack/qa-reports/qa-report-junction-PROJ-4-2026-05-06.md)
+
+**Acceptance Criteria:** 8/8 erfüllt (alle Items oben in der ersten Liste).
+
+**Tests:** 98/98 grün — 42 PROJ-4-spezifisch (mapping, profiles-ini, lock, url-hash, detect, read, write).
+
+**Live-Verifikation gegen echte Profile:**
+- Firefox Developer Edition: Profil via `installs.ini` aufgelöst, **3'092 Bookmarks** in 169 Foldern fehlerfrei gelesen, deutsche Sonderzeichen + Pfade mit Leerzeichen korrekt.
+- Zen: zwei Profile gefunden, korrekte Auswahl von `installs.ini` über `Default=1`.
+- Lock-Detection: orphaned `.parentlock` korrekt als `unlocked` erkannt, kein false-positive.
+- **Round-Trip Read → Write → Read** gegen echte Firefox-Datei-Kopie: 1 Test-Bookmark eingefügt, korrekt zurückgelesen, Backup automatisch angelegt.
+- **Mobile-Root-Preservation**: Firefox-Sync-Bookmarks werden beim Write nicht angetastet.
+
+**Bugs gefunden und gefixt während QA:**
+
+- **ISSUE-001 (low):** `readBookmarks()` warf raw `Error` statt `FirefoxParseError` bei nicht-existenten Files. Fix in Commit `c73dfcb` (try/catch um `snapshotToTemp` ergänzt, +2 neue Tests).
+
+**Bugs deferred (niedrig, kein Showstopper):**
+- **F-001:** `profiles-ini.ts:resolveProfileDir` validiert `Path` aus `profiles.ini` nicht. Defense-in-Depth-Gap, Trust-Boundary erlaubt es (User hat User-Rechte).
+- **Schema-Version-Drift:** Beim Firefox-Major-Update könnte das Schema kippen. Adapter überspringt Browser sauber bei fehlenden Roots — akzeptables Verhalten.
+
+**Verdict:** **Approved**. 0 Critical, 0 High, 0 Medium offen. Bereit für PROJ-6 Sync-Engine-Integration.
 
 ## Deployment
 _To be added by /deploy_
