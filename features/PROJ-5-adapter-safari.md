@@ -1,8 +1,8 @@
 # PROJ-5: Bookmark-Adapter Safari
 
-## Status: In Progress
+## Status: Approved
 **Created:** 2026-05-06
-**Last Updated:** 2026-05-06 (Backend done, ready for QA)
+**Last Updated:** 2026-05-06 (QA passed, Health Score 94/100)
 
 ## Dependencies
 - PROJ-1 (Electron-Shell) für die Permission-Onboarding-UI
@@ -278,7 +278,25 @@ Safari hat keinen Lock-File. Process-Scan über `pgrep` oder direktes Lesen aus 
 - Keine Wiederherstellung nach widerrufter Permission im Live-Betrieb (Onboarding triggert beim nächsten Boot)
 
 ## QA Test Results
-_To be added by /qa_
+
+**Datum:** 2026-05-06
+**Tier:** Standard
+**Health Score:** 94/100
+**Bericht:** `.gstack/qa-reports/qa-report-junction-PROJ-5-2026-05-06.md`
+
+**Resultat:**
+- 11/11 Acceptance Criteria erfüllt
+- 28 neue Safari-Tests grün, gesamt 126/126
+- 0 Critical, 0 High, 0 Medium, 2 Low
+  - ISSUE-001: Path-Traversal-Defense-in-Depth in `browserId` (deferred — Sammelfix in PROJ-6 Sync-Engine, identisch zu PROJ-3/4)
+  - ISSUE-002: Slugify-Doppelung während Build, automatisch erledigt
+- Live-Probe: TCC liefert `EPERM` (Apple-Quirk, korrekt als denied behandelt)
+- Browser-Test der Onboarding-UI: denied → granted Flow sauber, keine Console-Errors
+
+**Ausstehend nach Codesigning:**
+- Read gegen echte `~/Library/Safari/Bookmarks.plist`
+- Round-Trip-Test mit Kopie der Live-Datei
+- iCloud-Propagation auf iOS Safari (manueller Test)
 
 ## Deployment
 _To be added by /deploy_
