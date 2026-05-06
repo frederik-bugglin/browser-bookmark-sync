@@ -22,7 +22,7 @@
 | PROJ-6 | Sync-Engine | Architected | [PROJ-6-sync-engine.md](PROJ-6-sync-engine.md) | 2026-05-06 |
 | PROJ-7 | Sync-Trigger (manuell und automatisch) | Planned | [PROJ-7-sync-trigger.md](PROJ-7-sync-trigger.md) | 2026-05-06 |
 | PROJ-8 | Settings-UI | Planned | [PROJ-8-settings-ui.md](PROJ-8-settings-ui.md) | 2026-05-06 |
-| PROJ-9 | Konflikt-Log | Planned | [PROJ-9-conflict-log.md](PROJ-9-conflict-log.md) | 2026-05-06 |
+| PROJ-9 | Konflikt-Log | Architected | [PROJ-9-conflict-log.md](PROJ-9-conflict-log.md) | 2026-05-06 |
 
 <!-- Add features above this line -->
 

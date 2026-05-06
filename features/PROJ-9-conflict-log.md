@@ -1,8 +1,8 @@
 # PROJ-9: Konflikt-Log
 
-## Status: Planned
+## Status: Architected
 **Created:** 2026-05-06
-**Last Updated:** 2026-05-06 (Refined via /requirements)
+**Last Updated:** 2026-05-06 (Tech Design via /architecture)
 
 ## Dependencies
 - PROJ-2 (Supabase Backend) für `conflict_log`-Tabelle und RLS
@@ -121,7 +121,191 @@ Engine schreibt also **nicht** für jede LWW-Entscheidung einen Log-Eintrag, son
 <!-- Sections below are added by subsequent skills -->
 
 ## Tech Design (Solution Architect)
-_To be added by /architecture_
+
+### Wo lebt die Feature
+
+Konflikt-Log ist überwiegend Frontend (Next.js-Seite unter `/conflicts`) plus eine kleine Main-Process-Schicht für Cloud-Queries und die Restore-Aktion. Die Sync-Engine (PROJ-6) liefert die Daten als Insert-Schreiber, PROJ-9 ist nur Konsument plus User-Interaktion.
+
+Die Tabelle `conflict_log` lebt in Supabase. Einträge werden ausschliesslich vom Sync-Engine-Code im Main-Prozess geschrieben. Reads, Filter und Restores gehen über IPC zwischen Renderer und Main, identisch zum bestehenden `auth`- und `permissions`-Pattern.
+
+### Komponenten-Struktur
+
+**Frontend (`src/app/conflicts/page.tsx` plus Komponenten unter `src/components/conflicts/`):**
+
+```
+/conflicts (Next.js-Seite, statisch)
++-- AppShell (bestehend)
+    +-- ConflictsHeader
+    |   +-- Titel, Zähler offener Konflikte
+    +-- FilterBar
+    |   +-- Date-Range-Picker (von/bis)
+    |   +-- Browser-Multi-Select (Winner-Filter)
+    |   +-- Browser-Multi-Select (Loser-Filter)
+    |   +-- Status-Select (open / restored / dismissed / alle)
+    |   +-- Such-Input (Titel + URL)
+    +-- ConflictsTable
+    |   +-- Header-Row (Datum, Winner, Loser, Titel, Status, Aktion)
+    |   +-- Body-Rows (klickbar -> öffnet Detail-Dialog)
+    |       +-- Status-Badge (Farb-codiert: blau open, grün restored, grau dismissed)
+    +-- LoadMoreButton (Infinite-Scroll-Trigger)
+    +-- EmptyState (wenn 0 Treffer im Filter)
+    +-- ConflictDetailDialog (modal, lazy gerendert)
+        +-- Header (Sync-Run-ID, Timestamp, beide Browser-Namen)
+        +-- TwoColumnDiff
+        |   +-- Winner-Column (Felder: Titel, URL, Pfad, dateModified)
+        |   +-- Loser-Column (mit Diff-Highlights)
+        +-- FooterButtons (Wiederherstellen, Als erledigt markieren, Schliessen)
+```
+
+**Main-Side-Module (`electron/conflicts/`):**
+
+```
+electron/conflicts/
++-- index.ts        // Public API: list, getById, restore, dismiss, countSinceLastSeen, prune
++-- query.ts        // Supabase-Wrapper: filtered list, get-by-id, count-query
++-- restore.ts      // Schreibt loser-Version in bookmarks_cloud, ruft engine.runSync()
++-- prune.ts        // Boot-time-Pruning: löscht alte non-open Einträge
++-- types.ts        // ConflictEntry, ConflictFilter, ConflictStatus
+```
+
+**IPC-Handler (in `electron/ipc.ts`):**
+
+```
+conflicts:list(filter)              -> ConflictEntry[] + nextCursor
+conflicts:get-by-id(id)             -> ConflictEntry
+conflicts:count-since-last-seen()   -> number
+conflicts:mark-seen()               -> void  (setzt lastConflictsSeenAt)
+conflicts:restore(id)               -> { ok: true } | { ok: false, message }
+conflicts:dismiss(id)               -> void
+conflicts:state:changed             -> Push-Event nach restore/dismiss
+```
+
+### Datenmodell (Plain Language)
+
+**Cloud (Supabase, RLS owner-only):**
+
+| Tabelle | Eine Row enthält |
+|---|---|
+| `conflict_log` | Identitäts-Hash der Bookmark, beide Versionen als JSONB (Winner-Version und Loser-Version), Winner- und Loser-Browser-ID, Sync-Run-ID, Status (`open`/`restored`/`dismissed`), `created_at`, optional `resolved_at`, optional `restore_origin_id` (zeigt zurück auf den Konflikt, dessen Restore diesen neuen Konflikt erzeugt hat) |
+
+**Lokaler State (Electron-AppState, schon vorhanden, wird erweitert):**
+
+| Feld | Inhalt | Wo |
+|---|---|---|
+| `lastConflictsSeenAt` | Zeitstempel des letzten Öffnens der Konflikt-Log-Seite | `<userData>/app-state.json` (bestehende Datei aus PROJ-1) |
+
+**Indexe auf `conflict_log` (Performance):**
+
+- Auf `(user_id, status, created_at DESC)` — primärer Filter-Pfad
+- Auf `(user_id, winner_browser_id)` und `(user_id, loser_browser_id)` — Browser-Filter
+- Auf `(user_id, bookmark_hash)` — für Restore-Ketten und Detail-Verlinkung
+
+### Tech-Decisions (warum)
+
+#### 1. Server-side Filter via Supabase, nicht client-side
+
+**Warum:** Bei einem aktiven User können sich über Monate ein paar Tausend Einträge ansammeln. Alle Daten in den Renderer zu laden und dort zu filtern wäre langsam und speicherintensiv. Supabase kennt SQL-Indexe und liefert vorgefilterte Pages. Der Renderer kümmert sich nur um Anzeige.
+
+**Tradeoff:** Jeder Filter-Klick ist ein Round-Trip zu Supabase. Bei 100ms Latenz fühlt sich das responsiv an, bei 500ms schon träge. Mitigation: Debouncing im Such-Input, Loading-Spinner bei Filter-Änderung.
+
+#### 2. Infinite-Scroll mit Range-Pagination, nicht Cursor-Pagination
+
+**Warum:** Range-Pagination (`OFFSET ... LIMIT 50`) ist einfach und für ≤10'000 Einträge schnell genug. Cursor-Pagination wäre robuster gegen gleichzeitige Inserts, aber bei einem Konflikt-Log ist das selten relevant — neue Konflikte entstehen nur bei Sync-Läufen, der User scrollt selten genau in dem Moment.
+
+**Tradeoff:** Bei Filter-Änderung muss von vorne neu geladen werden. Akzeptabel.
+
+#### 3. Diff-Library für Wort-Level-Markierung
+
+**Warum:** `diff` (npm) ist klein, populär, gut gepflegt. Wort-Level reicht für Bookmark-Titel, weil Titel typischerweise nur ein paar Wörter sind und Char-Level zu viel Lärm produziert. Für URLs (mit Hash-Kollision selten, aber möglich) ist Char-Level besser, da kommt eine zweite Diff-Mode zum Einsatz.
+
+**Tradeoff:** ~50 KB extra im Bundle. Für eine Detail-Seite akzeptabel.
+
+#### 4. Restore über die Sync-Engine, nicht direkter Adapter-Write
+
+**Warum:** Vom User in /requirements bestätigt. Konsistenz mit der Pipeline-Logik, kein zweiter Code-Pfad für Adapter-Writes. Restore ist konzeptuell "neue gewinnende Version mit aktuellem Timestamp einfügen" — exakt das, was die Pipeline kann.
+
+**Architektur-Konsequenz:** PROJ-6 muss eine kleine Public-Funktion `markBookmarkForRestore(hash, version)` exportieren, die in `bookmarks_cloud` die neue Version mit aktualisiertem `dateModified` schreibt und dann `runSync()` triggert. Diese Funktion ist die einzige Stelle, an der PROJ-9 in PROJ-6-Internals greift.
+
+#### 5. Boot-time Pruning, nicht Edge Function
+
+**Warum:** Edge Functions auf Supabase würden ein zusätzliches Deployment-Artefakt erfordern (CI/CD für Edge-Code, Cron-Trigger, Logging). Boot-time-Pruning auf dem Mac ist viel einfacher: einmal pro Tag pro User beim App-Start, idempotent, nichts zu deployen.
+
+**Tradeoff:** Wenn Junction tagelang nicht läuft, wächst das Log weiter. Akzeptabel — sobald Junction wieder startet, wird's gepurged.
+
+#### 6. Status-Badge mit Farbe statt Status-Spalte mit Text
+
+**Warum:** Visueller Scan ist schneller bei Farbe. shadcn-Badge unterstützt Variants. Kein Plain-Text-Status, weil "offen", "wiederhergestellt", "erledigt" alle unterschiedlich lang sind und die Tabelle-Layout-Brechung kostet.
+
+**Farbcodierung:**
+
+| Status | Badge-Variante |
+|---|---|
+| `open` | Default (mittlere Akzent-Farbe, Aufmerksamkeit) |
+| `restored` | Outline-Variant in Grün (erledigt, nicht laut) |
+| `dismissed` | Secondary (gedämpft, im Hintergrund) |
+
+#### 7. Keine Real-Time-Subscription auf `conflict_log`
+
+**Warum:** Konflikte entstehen nur bei Sync-Läufen. Sync-Läufe sind nicht häufig genug, um einen Realtime-Listener zu rechtfertigen. Stattdessen: Refresh nach `restore` / `dismiss` (Push-Event aus Main an Renderer), Refresh beim Page-Open. Spart Verbindung und Komplexität.
+
+**Tradeoff:** Wenn ein anderer Mac des Users gerade einen Sync gemacht hat (Multi-Mac-Setup), sieht dieser User das nicht sofort. Er sieht es beim nächsten Page-Open oder eigenen Sync. Akzeptabel im MVP.
+
+### Edge Cases (Architektur-Sicht)
+
+| Fall | Verhalten |
+|---|---|
+| Restore auf Eintrag mit `status != 'open'` | Renderer disabled den Restore-Button, IPC-Handler zusätzlich serverseitig: returnt Fehler-Message, kein Schreibvorgang |
+| Restore-Race: User klickt während Auto-Sync läuft | Single-Instance-Lock im Main-Prozess (PROJ-6) verhindert parallelen Sync. Restore queued sich, läuft direkt nach dem laufenden Sync |
+| Filter mit 0 Treffern | EmptyState zeigt "Keine Konflikte für diesen Filter", separate Komponente von "noch nie ein Konflikt entstanden" (Onboarding-Empty) |
+| Page-Open mit 5'000 Einträgen | Erste Page (50) lädt sofort, weitere Pages on-demand. Initial-Load <500ms |
+| Restore-Origin-Kette tiefer als 5 | Detail-Dialog zeigt Verweis "Folgekonflikt von ...", aber keine vollständige Kette (UX-Komplexität nicht gerechtfertigt). Phase-2 wenn User danach fragt |
+| User offline, klickt Restore | Restore-Handler erkennt Offline-State, returnt "offline"-Fehler, UI zeigt Toast "Sync nicht erreichbar" |
+| Bookmark zwischenzeitlich überall gelöscht | Restore-Handler erstellt sie neu in `bookmarks_cloud`, Sync propagiert. Detail-Dialog zeigt vorab eine Warnung "Bookmark existiert aktuell in keinem Browser" |
+| Diff-Library findet keinen sinnvollen Diff (z.B. komplett unterschiedliche Felder) | Renderer zeigt einfach beide Felder vollständig markiert, ohne Wort-Level-Diff |
+
+### Component-Tree für die UI (intern)
+
+```
+ConflictsPage (Server-Component)
++-- AppShell
+    +-- Suspense
+    |   +-- ConflictsView (Client-Component)
+    |       +-- ConflictsHeader
+    |       +-- FilterBar
+    |       +-- ConflictsTable
+    |       |   +-- ConflictRow (klickbar)
+    |       +-- LoadMoreButton
+    |       +-- EmptyState
+    |       +-- ConflictDetailDialog (lazy, conditional render)
+    |           +-- DiffRenderer (Wort-Level für Titel, Char-Level für URL)
+    |           +-- ActionButtons
+    +-- Toast-Region (für Restore-Bestätigung und Offline-Hinweise)
+```
+
+### Dependencies (zu installieren)
+
+- `diff` — Wort-Level + Char-Level Diff-Berechnung (~50 KB)
+- `react-day-picker` — Date-Range-Picker, wird von shadcn `Calendar` als Peer-Dep verwendet
+- `date-fns` — Date-Arithmetik für Range-Filter und Retention-Anzeige
+- `@supabase/supabase-js` — schon vorhanden aus PROJ-2
+- shadcn/ui-Komponenten: `Calendar`, `Tooltip` falls noch nicht installiert; alle anderen (Table, Dialog, Badge, Input, Select, ScrollArea, Popover) sind schon da
+
+### Was diese Architektur explizit NICHT enthält
+
+- **Keine Real-Time-Subscription** auf Cloud-Änderungen — Refresh-Modell reicht
+- **Kein lokaler IndexedDB-Cache** der Konflikt-Liste — Online-only akzeptiert
+- **Keine Worker-Threads für Diff-Berechnung** — Diff bei Bookmark-Titeln ist schnell, kein Performance-Risiko
+- **Keine i18n** — alles auf Deutsch, konsistent mit dem Rest der App
+- **Keine Edge Function** für Pruning — Boot-Trigger reicht
+- **Keine Animationen für Status-Übergänge** in der Tabelle — Toast bestätigt Aktionen, das reicht
+- **Kein Drag-and-Drop oder Multi-Select** in der Tabelle — Bulk-Aktionen sind Phase 2
+
+### Risiken und offene Fragen für Implementation
+
+1. **Date-Range-Picker-Bibliothek:** shadcn nutzt `react-day-picker`. Default-UI ist OK, aber für eine deutsche Schweizer Lokalisierung (Wochenbeginn Montag, deutsche Monatsnamen) braucht's einen Locale-Import. Frontend-Phase muss das verifizieren
+2. **Diff-Performance bei sehr langen Pfaden:** Wenn der User Bookmarks tief verschachtelt hat (z.B. `/lesezeichenleiste/recherche/projekte/2026/q2/notes/draft`), wird der Pfad-Diff visuell überfordernd. Frontend entscheidet, ob Pfad nur als kompletter String diffed wird oder Segment-für-Segment. Empfehlung: Segment-Level mit Klappbar-Mechanik
+3. **Restore-Bestätigung-UI:** Soll Klick auf "Wiederherstellen" sofort handeln oder erst per `AlertDialog` bestätigen? Dauerhaftes UX-Pattern in der App: Restore = nicht destruktiv, Direct-Click ist OK; Dismiss = ebenfalls direct-Click. Wenn der Nutzer doch unsicher: optionale Confirm-Setting in Phase 2
+4. **Tabelle-Performance bei 10'000+ Einträgen:** Range-Pagination liefert nur 50 pro Page, also kein Renderer-Performance-Problem. Das eigentliche Risiko ist die Supabase-Query-Geschwindigkeit ohne passenden Index. Backend muss die genannten Indexe explizit setzen, sonst Full-Table-Scan
 
 ## QA Test Results
 _To be added by /qa_
