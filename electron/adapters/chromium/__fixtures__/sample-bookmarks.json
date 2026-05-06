@@ -1,0 +1,81 @@
+{
+  "checksum": "0000000000000000000000000000000a",
+  "roots": {
+    "bookmark_bar": {
+      "children": [
+        {
+          "date_added": "13416172208415686",
+          "id": "5",
+          "name": "GitHub",
+          "type": "url",
+          "url": "https://github.com/?utm_source=newsletter"
+        },
+        {
+          "date_added": "13416172208415686",
+          "id": "6",
+          "name": "Recherche",
+          "type": "folder",
+          "children": [
+            {
+              "date_added": "13416172208415999",
+              "id": "7",
+              "name": "Hacker News",
+              "type": "url",
+              "url": "https://news.ycombinator.com/"
+            },
+            {
+              "date_added": "13416172208416000",
+              "id": "8",
+              "name": "Sub-Folder",
+              "type": "folder",
+              "children": [
+                {
+                  "date_added": "13416172208416001",
+                  "id": "9",
+                  "name": "Deeply Nested",
+                  "type": "url",
+                  "url": "https://example.com/deep"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "date_added": "13416172208415000",
+      "id": "1",
+      "name": "Bookmarks bar",
+      "type": "folder"
+    },
+    "other": {
+      "children": [
+        {
+          "date_added": "13416172208420000",
+          "id": "10",
+          "name": "Privates Lesezeichen",
+          "type": "url",
+          "url": "https://privat.example.org/"
+        }
+      ],
+      "date_added": "13416172208400000",
+      "id": "2",
+      "name": "Other bookmarks",
+      "type": "folder"
+    },
+    "synced": {
+      "children": [
+        {
+          "date_added": "13416172208430000",
+          "id": "11",
+          "name": "iOS-Bookmark",
+          "type": "url",
+          "url": "https://ios.example.org/"
+        }
+      ],
+      "date_added": "13416172208400001",
+      "id": "3",
+      "name": "Mobile bookmarks",
+      "type": "folder"
+    }
+  },
+  "version": 1
+}
