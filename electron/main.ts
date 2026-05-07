@@ -104,7 +104,24 @@ async function boot(): Promise<void> {
   });
 
   const tray = createTray(windows, appStateStore, () => {
-    appStateStore.set({ lastSyncStatus: 'idle' });
+    // Manual sync trigger from the tray. Full scheduler comes with PROJ-7.
+    // We update lastSyncStatus before/after so the tray icon and Renderer
+    // subscribers see the run progress.
+    void (async () => {
+      try {
+        appStateStore.set({ lastSyncStatus: 'running' });
+        const result = await syncService.run('manual');
+        appStateStore.set({
+          lastSyncStatus: result.outcome === 'success' ? 'success' : 'error',
+          lastSyncAt: new Date().toISOString(),
+        });
+      } catch (err) {
+        appStateStore.set({ lastSyncStatus: 'error' });
+        // Keep the rejection visible in dev for now; PROJ-7 will surface
+        // failures via a Renderer-side toast.
+        console.error('[junction] manual sync failed:', err);
+      }
+    })();
   });
 
   if (authService.getStatus().state !== 'authenticated') {
