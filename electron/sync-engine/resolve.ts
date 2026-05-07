@@ -119,10 +119,18 @@ export function resolve(input: ResolveInput): ResolveOutput {
   return { upserts, deletes, conflicts };
 }
 
-// Two changes "produce the same outcome" when both are deletes, or both are
-// adds/updates with identical user-visible content (title in MVP).
+// Two changes "produce the same outcome" when:
+//  - both are deletes (everyone agrees the bookmark is gone), OR
+//  - both are adds/updates with identical user-visible content, OR
+//  - one is a delete and the other carries the same title the deleted side
+//    used to have. This is the edit-beats-delete case: a browser briefly
+//    forgot the bookmark and another browser still has it unchanged. The
+//    pipeline's edit-beats-delete logic preserves the bookmark; logging it
+//    as a "conflict" floods the log with non-actionable churn each sync.
 function changeProducesSameOutcome(a: BookmarkChange, b: BookmarkChange): boolean {
   if (a.kind === 'deleted' && b.kind === 'deleted') return true;
-  if (a.kind === 'deleted' || b.kind === 'deleted') return false;
+  if (a.kind === 'deleted' || b.kind === 'deleted') {
+    return a.value.title === b.value.title;
+  }
   return a.value.title === b.value.title;
 }

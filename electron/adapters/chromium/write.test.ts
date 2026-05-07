@@ -89,9 +89,23 @@ describe('writeBookmarks', () => {
 
   it('throws BrowserRunningError when SingletonLock points at a live process', () => {
     const snapshot = readBookmarks(bookmarksPath, 'chrome');
-    symlinkSync(`${os.hostname()}-${process.pid}`, path.join(profileDir, 'SingletonLock'));
+    // SingletonLock lives in the user-data root (parent of "Default"), which
+    // matches Chrome's real layout. Putting it in profileDir would not be
+    // detected and the write would proceed against a live browser.
+    symlinkSync(`${os.hostname()}-${process.pid}`, path.join(path.dirname(profileDir), 'SingletonLock'));
     expect(() =>
       writeBookmarks({ bookmarksPath, browserId: 'chrome', profileDir, snapshot, userDataDir }),
     ).toThrow(BrowserRunningError);
+  });
+
+  it('does NOT trip on a SingletonLock placed inside the profile dir (regression)', () => {
+    // Pre-fix bug: lock check ran against profileDir, so a stray symlink
+    // there would falsely trigger BrowserRunningError. After the fix,
+    // chromium only treats the user-data-root SingletonLock as authoritative.
+    const snapshot = readBookmarks(bookmarksPath, 'chrome');
+    symlinkSync(`${os.hostname()}-${process.pid}`, path.join(profileDir, 'SingletonLock'));
+    expect(() =>
+      writeBookmarks({ bookmarksPath, browserId: 'chrome', profileDir, snapshot, userDataDir }),
+    ).not.toThrow();
   });
 });

@@ -91,8 +91,16 @@ function chromiumDriver(
     plan() {
       if (!detected.installed) return { browserId, reason: 'not-installed' };
       if (!detected.hasDefaultProfile) return { browserId, reason: 'no-default-profile' };
-      // Chromium adapters don't gate on lock for reads (we copy the file);
-      // writes will throw BrowserRunningError if the browser is up.
+      // Writing while Chrome is running silently corrupts data: Chrome holds
+      // the bookmark JSON in memory and writes it back over our edits when it
+      // detects the file changed. Skip the whole sync for this browser.
+      if (detected.lock.running) {
+        return {
+          browserId,
+          reason: 'browser-running-write',
+          detail: `${detected.name} is open; close it before syncing to avoid data loss.`,
+        };
+      }
       return { browserId, reason: 'eligible' };
     },
     read() {

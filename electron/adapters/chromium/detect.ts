@@ -76,7 +76,13 @@ export function detectBrowser(config: ChromiumBrowserConfig): DetectedBrowser {
     hasDefaultProfile,
     profileDir,
     bookmarksPath,
-    lock: hasDefaultProfile ? checkLock(profileDir) : { running: false, reason: 'no-lock' },
+    // SingletonLock lives in the user-data root (one level up from "Default"),
+    // not in the profile sub-directory. Checking the wrong path silently
+    // returned "no-lock" while the browser was actually running, which let
+    // writes proceed and Chrome's in-memory state then overwrote our changes.
+    lock: hasDefaultProfile
+      ? checkLock(config.profileBaseDir)
+      : { running: false, reason: 'no-lock' },
   };
 }
 

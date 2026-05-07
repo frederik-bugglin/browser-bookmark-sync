@@ -115,7 +115,9 @@ export type WriteOptions = {
 };
 
 export function writeBookmarks({ bookmarksPath, browserId, profileDir, snapshot, userDataDir }: WriteOptions): void {
-  const lock = checkLock(profileDir);
+  // SingletonLock sits in the user-data root (parent of "Default"), not in
+  // the profile dir. See detect.ts for the same rationale.
+  const lock = checkLock(path.dirname(profileDir));
   if (lock.running) {
     throw new BrowserRunningError(browserId, lock.pid);
   }

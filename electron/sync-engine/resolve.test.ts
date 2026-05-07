@@ -135,6 +135,32 @@ describe('resolve', () => {
     expect(result.conflicts[0].loser_browser_id).toBe('chrome');
   });
 
+  it('does NOT log a conflict when edit-beats-delete carries the same title', () => {
+    // Regression: when one browser's file briefly drops a bookmark (e.g.
+    // Chrome rewrote its file while running and trimmed entries), the diff
+    // fires a delete on that side and an add/update with identical content
+    // on the other side. The pipeline correctly preserves the bookmark via
+    // edit-beats-delete -- but we used to also write a conflict_log row,
+    // flooding the log with thousands of identical-title "conflicts" each
+    // sync. Same-title delete-vs-live = routine, not a user conflict.
+    const live = bookmark({ urlNormalized: 'https://a/', title: 'Ubuntu' });
+    const tombstone = bookmark({ urlNormalized: 'https://a/', title: 'Ubuntu' });
+    const hash = hashOf(live);
+    const result = resolve(
+      makeInput({
+        changesByBrowser: new Map<BrowserId, BookmarkChange[]>([
+          ['firefox', [{ kind: 'added', hash, value: live }]],
+          ['chrome', [{ kind: 'deleted', hash, value: tombstone }]],
+        ]),
+        currentByBrowser: new Map([['firefox', new Map([[hash, live]])]]),
+      }),
+    );
+    expect(result.upserts.length).toBe(1);
+    expect(result.upserts[0].title).toBe('Ubuntu');
+    expect(result.deletes).toEqual([]);
+    expect(result.conflicts).toEqual([]);
+  });
+
   it('Safari without dateModified falls back to syncRunAt and tie-breaks alphabetically', () => {
     const safari = bookmark({
       urlNormalized: 'https://a/',
