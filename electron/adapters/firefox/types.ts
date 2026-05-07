@@ -41,7 +41,17 @@ export class BrowserRunningError extends Error {
 
 export class FirefoxParseError extends Error {
   constructor(public readonly browserId: string, public readonly cause: unknown) {
-    super(`Failed to read places.sqlite for "${browserId}"`);
+    const causeMsg =
+      cause instanceof Error
+        ? `${cause.name}: ${cause.message}`
+        : typeof cause === 'string'
+          ? cause
+          : '';
+    super(
+      causeMsg
+        ? `Failed to access places.sqlite for "${browserId}" — ${causeMsg}`
+        : `Failed to access places.sqlite for "${browserId}"`,
+    );
     this.name = 'FirefoxParseError';
   }
 }

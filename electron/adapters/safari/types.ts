@@ -51,7 +51,17 @@ export class SafariPermissionError extends Error {
 
 export class SafariParseError extends Error {
   constructor(public readonly plistPath: string, public readonly cause: unknown) {
-    super(`Failed to parse Safari Bookmarks.plist at ${plistPath}`);
+    const causeMsg =
+      cause instanceof Error
+        ? `${cause.name}: ${cause.message}`
+        : typeof cause === 'string'
+          ? cause
+          : '';
+    super(
+      causeMsg
+        ? `Failed to parse Safari Bookmarks.plist at ${plistPath} — ${causeMsg}`
+        : `Failed to parse Safari Bookmarks.plist at ${plistPath}`,
+    );
     this.name = 'SafariParseError';
   }
 }

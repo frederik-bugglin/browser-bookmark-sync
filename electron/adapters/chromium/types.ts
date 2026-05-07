@@ -93,7 +93,17 @@ export class BrowserRunningError extends Error {
 
 export class ChromiumParseError extends Error {
   constructor(public readonly browserId: string, public readonly cause: unknown) {
-    super(`Failed to parse bookmarks file for "${browserId}"`);
+    const causeMsg =
+      cause instanceof Error
+        ? `${cause.name}: ${cause.message}`
+        : typeof cause === 'string'
+          ? cause
+          : '';
+    super(
+      causeMsg
+        ? `Failed to parse bookmarks file for "${browserId}" — ${causeMsg}`
+        : `Failed to parse bookmarks file for "${browserId}"`,
+    );
     this.name = 'ChromiumParseError';
   }
 }
