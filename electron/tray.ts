@@ -20,6 +20,10 @@ export function createTray(
   if (image.isEmpty()) tray.setTitle('Junction');
 
   const refreshMenu = () => {
+    // Window-bounds saves during shutdown can fire AppState change events
+    // after we've called tray.destroy(). Guard so we don't crash on exit.
+    if (tray.isDestroyed()) return;
+
     const status = appStateStore.get().lastSyncStatus;
     const lastAt = appStateStore.get().lastSyncAt;
     const statusLabel = formatStatusLabel(status, lastAt);
@@ -40,11 +44,13 @@ export function createTray(
   appStateStore.on('change', refreshMenu);
 
   tray.on('click', () => {
+    if (tray.isDestroyed()) return;
     const bounds = tray.getBounds();
     void windows.togglePopover(bounds);
   });
 
   tray.on('right-click', () => {
+    if (tray.isDestroyed()) return;
     tray.popUpContextMenu();
   });
 
