@@ -73,33 +73,27 @@ export function registerIpcHandlers({ appStateStore, settingsStore, windows, aut
     return sync.run(t);
   });
 
-  appStateStore.on('change', (state: AppState) => {
+  // During shutdown, webContents can be destroyed before the BrowserWindow
+  // itself reports isDestroyed() = true. We need to guard both checks AND
+  // wrap in try/catch because Electron occasionally races the destruction
+  // even further (between our check and the send call).
+  function broadcast(channel: string, payload: unknown): void {
     for (const win of getAllWindows()) {
-      if (!win.isDestroyed()) win.webContents.send('app:state:changed', state);
+      if (win.isDestroyed()) continue;
+      const wc = win.webContents;
+      if (wc.isDestroyed()) continue;
+      try {
+        wc.send(channel, payload);
+      } catch {
+        // Window torn down between the isDestroyed check and the send.
+        // Best-effort delivery; the renderer will resync on next launch.
+      }
     }
-  });
+  }
 
-  settingsStore.on('change', (settings: Settings) => {
-    for (const win of getAllWindows()) {
-      if (!win.isDestroyed()) win.webContents.send('settings:changed', settings);
-    }
-  });
-
-  auth.on('change', (status: AuthStatus) => {
-    for (const win of getAllWindows()) {
-      if (!win.isDestroyed()) win.webContents.send('auth:status:changed', status);
-    }
-  });
-
-  permissions.on('change', (state: PermissionsState) => {
-    for (const win of getAllWindows()) {
-      if (!win.isDestroyed()) win.webContents.send('permissions:state:changed', state);
-    }
-  });
-
-  sync.on('change', (state: SyncState) => {
-    for (const win of getAllWindows()) {
-      if (!win.isDestroyed()) win.webContents.send('sync:state:changed', state);
-    }
-  });
+  appStateStore.on('change', (state: AppState) => broadcast('app:state:changed', state));
+  settingsStore.on('change', (settings: Settings) => broadcast('settings:changed', settings));
+  auth.on('change', (status: AuthStatus) => broadcast('auth:status:changed', status));
+  permissions.on('change', (state: PermissionsState) => broadcast('permissions:state:changed', state));
+  sync.on('change', (state: SyncState) => broadcast('sync:state:changed', state));
 }
