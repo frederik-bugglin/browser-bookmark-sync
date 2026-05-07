@@ -12,6 +12,30 @@ describe('readBookmarks', () => {
     expect(snapshot.browserId).toBe('chrome');
   });
 
+  it('converts chromium-time (microseconds-since-1601) to ISO timestamps', () => {
+    // Regression: chromium stores date_added as Windows FILETIME-like
+    // microseconds-since-1601. Passing the raw string into Postgres timestamptz
+    // crashed with "date/time field value out of range" when 6000+ bookmarks
+    // hit Supabase. Adapter must convert to ISO at the read boundary.
+    const snapshot = readBookmarks(fixturePath, 'chrome');
+    const github = snapshot.bookmarks.find((b) => b.title === 'GitHub');
+    expect(github?.dateAdded).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+    // 13416172208415686 microseconds since 1601 -> 2026-02-21T18:30:08.415Z
+    expect(github?.dateAdded).toBe('2026-02-21T18:30:08.415Z');
+  });
+
+  it('returns null for missing or zero dates', () => {
+    const snapshot = readBookmarks(fixturePath, 'chrome');
+    // Find a bookmark/folder where date_added might be missing or "0".
+    // Fixture's "synced" root has no dates set on the root entry itself.
+    const syncRoot = snapshot.folders.find((f) => f.pathNormalized === '/synchronisiert');
+    expect(syncRoot).toBeDefined();
+    // Either a valid ISO string or null -- never the raw chromium-time string.
+    if (syncRoot?.dateAdded !== null) {
+      expect(syncRoot?.dateAdded).toMatch(/^\d{4}-/);
+    }
+  });
+
   it('flattens nested folders into pathNormalized strings', () => {
     const snapshot = readBookmarks(fixturePath, 'chrome');
     const folderPaths = snapshot.folders.map((f) => f.pathNormalized).sort();

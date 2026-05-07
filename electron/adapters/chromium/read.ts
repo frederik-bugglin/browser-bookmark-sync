@@ -34,6 +34,32 @@ type Acc = {
   bookmarks: NormalizedBookmark[];
 };
 
+// Chromium stores `date_added` and `date_modified` as a decimal string of
+// microseconds since 1601-01-01 UTC (Windows FILETIME / WebKit time). The
+// engine and the Supabase schema speak ISO-8601, so we convert at the
+// adapter boundary. BigInt because the value overflows Number precision.
+const CHROMIUM_EPOCH_OFFSET_MICROS = 11644473600000000n;
+
+function chromiumTimeToIso(value: string | undefined | null): string | null {
+  if (!value || value === '0') return null;
+  let micros: bigint;
+  try {
+    micros = BigInt(value);
+  } catch {
+    return null;
+  }
+  if (micros <= 0n) return null;
+  const unixMicros = micros - CHROMIUM_EPOCH_OFFSET_MICROS;
+  if (unixMicros < 0n) return null;
+  const unixMillis = Number(unixMicros / 1000n);
+  if (!Number.isFinite(unixMillis) || unixMillis < 0) return null;
+  try {
+    return new Date(unixMillis).toISOString();
+  } catch {
+    return null;
+  }
+}
+
 function walk(
   node: ChromiumNode,
   rootKey: RootKey,
@@ -48,8 +74,8 @@ function walk(
       title: node.name,
       folderPath: parentPath,
       rootKey,
-      dateAdded: node.date_added ?? null,
-      dateModified: node.date_modified ?? null,
+      dateAdded: chromiumTimeToIso(node.date_added),
+      dateModified: chromiumTimeToIso(node.date_modified),
     });
     return;
   }
@@ -65,8 +91,8 @@ function walk(
     pathNormalized: folderPath,
     parentPath: isRoot ? null : parentPath,
     rootKey,
-    dateAdded: node.date_added ?? null,
-    dateModified: node.date_modified ?? null,
+    dateAdded: chromiumTimeToIso(node.date_added),
+    dateModified: chromiumTimeToIso(node.date_modified),
   });
 
   for (const child of node.children) {
