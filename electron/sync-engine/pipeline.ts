@@ -39,9 +39,14 @@ export async function runPipeline(deps: PipelineDeps): Promise<SyncRunResult> {
   const errors: string[] = [];
   let outcome: SyncRunOutcome = 'success';
   let safariRaceSuspect: boolean | undefined;
+  // Hoisted so finish() can read them whether we exited normally or via the
+  // outer catch. They start empty / null and get populated as phases run.
+  let planResults: BrowserPlan[] = [];
+  let resolved: ReturnType<typeof resolveChanges> | null = null;
 
+  try {
   // -------- Phase 1: PLAN --------
-  const planResults: BrowserPlan[] = deps.drivers.map((d) => d.plan());
+  planResults = deps.drivers.map((d) => d.plan());
   const eligible = planResults.filter(
     (p): p is EligibleBrowser => p.reason === 'eligible',
   );
@@ -104,7 +109,7 @@ export async function runPipeline(deps: PipelineDeps): Promise<SyncRunResult> {
   const cloudRows = await deps.cloud.fetchBookmarksCloud(deps.userId);
   const cloudByHash = new Map(cloudRows.map((r) => [r.bookmark_hash, r]));
 
-  const resolved = resolveChanges({
+  resolved = resolveChanges({
     userId: deps.userId,
     syncRunId: runId,
     syncRunAt: startedAt.toISOString(),
@@ -228,6 +233,14 @@ export async function runPipeline(deps: PipelineDeps): Promise<SyncRunResult> {
   }
 
   return finish(outcome);
+  } catch (err) {
+    // Any unhandled throw inside the pipeline lands here. We still want a
+    // run log on disk (for debugging) and a structured result, otherwise the
+    // tray just shows "error" with no breadcrumb.
+    const msg = (err as Error).message ?? String(err);
+    errors.push(`fatal: ${msg}`);
+    return finish('error');
+  }
 
   // ----------------------------------------------------------------------
 
