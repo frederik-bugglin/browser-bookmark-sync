@@ -6,7 +6,7 @@ import {
   unlinkSync,
 } from 'node:fs';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import { app } from 'electron';
 import { checkLock } from './lock';
@@ -80,13 +80,16 @@ function isoToMicros(value: string | null): number {
   return ms * 1000;
 }
 
-// Firefox bookmark GUIDs are 12 chars from a base64url-ish alphabet. We accept
-// any 12-char ASCII string from our snapshot; if the snapshot ID is longer
-// (Chromium's UUID-style), we derive a stable 12-char prefix.
+// Firefox bookmark GUIDs are 12 chars from a base64url-ish alphabet
+// ([A-Za-z0-9_-]). We hash the snapshot ID with SHA-256 and base64url-encode
+// it, then take the first 12 chars. Hashing (rather than slicing the raw ID)
+// is required because folder IDs from the engine are full pathNormalized
+// strings — slicing would collide on shared prefixes
+// (e.g. "/lesezeichenleiste/recherche" and "/lesezeichenleiste/recherche/sub"
+// both reduce to "/lesezeichen"). It also strips characters Firefox doesn't
+// accept in GUIDs, like "/".
 function makeGuid(snapshotId: string): string {
-  const compact = snapshotId.replace(/-/g, '');
-  if (compact.length >= 12) return compact.slice(0, 12);
-  return (compact + randomUUID().replace(/-/g, '')).slice(0, 12);
+  return createHash('sha256').update(snapshotId).digest('base64url').slice(0, 12);
 }
 
 type PlaceCache = Map<string, number>;

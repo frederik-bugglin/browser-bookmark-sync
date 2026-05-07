@@ -198,6 +198,74 @@ describe('writeBookmarks', () => {
     expect(sync?.rootKey).toBe('mobile');
   });
 
+  it('writes nested folders whose IDs share a long prefix', () => {
+    // Regression: folders synthesised by the sync engine use the full folderPath
+    // as their id (e.g. "/lesezeichenleiste/recherche" and
+    // "/lesezeichenleiste/recherche/sub-folder"). A naive slice(0, 12) GUID
+    // would collide here and trigger UNIQUE constraint failures.
+    const nested: NormalizedSnapshot = {
+      browserId: 'firefox',
+      folders: [
+        {
+          id: '/lesezeichenleiste/recherche',
+          name: 'Recherche',
+          pathNormalized: '/lesezeichenleiste/recherche',
+          parentPath: '/lesezeichenleiste',
+          rootKey: 'toolbar',
+          dateAdded: null,
+          dateModified: null,
+        },
+        {
+          id: '/lesezeichenleiste/recherche/sub-folder',
+          name: 'Sub',
+          pathNormalized: '/lesezeichenleiste/recherche/sub-folder',
+          parentPath: '/lesezeichenleiste/recherche',
+          rootKey: 'toolbar',
+          dateAdded: null,
+          dateModified: null,
+        },
+      ],
+      bookmarks: [
+        {
+          id: 'a'.repeat(32),
+          url: 'https://example.com/a',
+          urlNormalized: 'https://example.com/a',
+          title: 'A',
+          folderPath: '/lesezeichenleiste/recherche',
+          rootKey: 'toolbar',
+          dateAdded: null,
+          dateModified: null,
+        },
+        {
+          id: 'b'.repeat(32),
+          url: 'https://example.com/b',
+          urlNormalized: 'https://example.com/b',
+          title: 'B',
+          folderPath: '/lesezeichenleiste/recherche/sub-folder',
+          rootKey: 'toolbar',
+          dateAdded: null,
+          dateModified: null,
+        },
+      ],
+    };
+
+    expect(() =>
+      writeBookmarks({
+        placesPath,
+        browserId: 'firefox',
+        profileDir,
+        snapshot: nested,
+        userDataDir,
+      }),
+    ).not.toThrow();
+
+    const read = readBookmarks(placesPath, 'firefox');
+    expect(read.bookmarks.map((b) => b.title).sort()).toEqual(['A', 'B']);
+    expect(read.folders.find((f) => f.name === 'Sub')?.parentPath).toBe(
+      '/lesezeichenleiste/recherche',
+    );
+  });
+
   it('replaces existing bookmarks under the writable roots', () => {
     // First write
     writeBookmarks({
