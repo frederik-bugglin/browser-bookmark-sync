@@ -107,6 +107,27 @@ describe('BrowsersService', () => {
     expect(safari?.permissionsOk).toBe(false);
     detectionState.safari.permission = 'granted';
   });
+
+  it('refresh() picks up newly installed browsers without restart', () => {
+    // Simulate Brave being installed *after* the service was created.
+    const braveSlot = detectionState.chromium.find((b) => b.id === 'brave');
+    if (!braveSlot) throw new Error('Brave slot missing in mock');
+
+    const store = new JsonStore<Settings>('settings.json', SettingsSchema, defaultSettings);
+    const service = new BrowsersService(store);
+    expect(service.list().find((b) => b.id === 'brave')?.installed).toBe(false);
+
+    braveSlot.installed = true;
+    braveSlot.hasDefaultProfile = true;
+
+    const fresh = service.refresh();
+    expect(fresh.find((b) => b.id === 'brave')?.installed).toBe(true);
+    expect(service.list().find((b) => b.id === 'brave')?.detected).toBe(true);
+
+    // Reset for other tests.
+    braveSlot.installed = false;
+    braveSlot.hasDefaultProfile = false;
+  });
 });
 
 describe('migrateSettingsV1ToV2', () => {

@@ -1,6 +1,6 @@
 # PROJ-8: Settings-UI
 
-## Status: In Progress
+## Status: Approved
 **Created:** 2026-05-06
 **Last Updated:** 2026-05-08
 
@@ -147,7 +147,61 @@ Settings-Seite (bereits da)
 - QA-Tests stehen aus.
 
 ## QA Test Results
-_To be added by /qa_
+
+**QA-Pass am 2026-05-08, Standard-Tier.**
+
+### Methodik
+- Acceptance Criteria gegen Code-Implementation abgeglichen
+- Test-Suite: 214/214 grün (+1 Regressionstest aus QA: BrowsersService.refresh nach Browser-Installation)
+- TypeScript-Check für beide Configs (Renderer + Electron) clean
+- Settings-Page in Browser-Dev (Mock-Bridge) per Playwright durchgespielt: alle Toggles, "Neu erkannt"-Flow (Aktivieren-Button), "Alle Browser aus"-Hinweis, Persistenz nach Reload
+- Code-Review der kritischen Pfade: Schema-Migration v1→v2, Pipeline-Filter, IPC-Handler-Validierung, Logout-during-Sync
+
+### Acceptance Criteria
+| AC | Status | Code-Stelle |
+|----|--------|-------------|
+| Browser-Liste mit Status (installiert/erkannt/permissions/Toggle) | erfüllt | `settings-browsers-card.tsx` BrowserRow + describeStatus |
+| Toggle "In Sync einbeziehen", Default an wenn erkannt | abweichend (im Tech-Design dokumentiert) | Erst nach Bestätigung an statt automatisch — bewusste UX-Wahl |
+| Toggle "Auto-Sync aktivieren" | erfüllt | `settings-sync-section.tsx:59-63` |
+| Dropdown "Sync-Intervall" 5/15/30/60 | erfüllt | `settings-sync-section.tsx:76-93` |
+| Toggle "macOS-Notifications bei Fehlern" | erfüllt | `settings-sync-section.tsx:106-110` |
+| Toggle "Beim Login starten" | erfüllt | `settings/page.tsx:130` |
+| Logout-Button | erfüllt | `settings/page.tsx:108-112` |
+| Sofort speichern, kein Apply | erfüllt | `onCheckedChange` ruft direkt `junction().settings.set` |
+| electron-store-Persistenz | äquivalent (im Tech-Design dokumentiert) | `electron/store.ts` JsonStore, atomares Write + Schema-Validation |
+| shadcn/ui (Switch/Select/Card/Badge/Button) | erfüllt | Alle Imports vorhanden |
+
+### Edge Cases verifiziert
+| Case | Verhalten | Verifikation |
+|------|-----------|--------------|
+| Browser während offener Settings installiert | Mount-Refresh + window.focus-Refresh | `useBrowsers` Hook nach Bug-Fix |
+| Alle Browser ausgeschaltet | Hinweis "Aktuell ist kein Browser am Sync beteiligt..." erscheint | Browser-Test bestanden |
+| Permission fehlt (Safari) | Inline-"Erlauben"-Button + Switch disabled | Browser-Test bestanden |
+| Logout während Sync | `awaitIdle()` blockiert signOut bis Pipeline sauber endet | Code-Review bestätigt |
+| Schema-Migration v1→v2 | Bestandsnutzer bekommen alle erkannten Browser auf an | Test-Coverage in `browsers.test.ts` |
+
+### Gefundene Bugs
+
+#### ISSUE-001 (Medium) — useBrowsers fehlte Mount-Refresh
+**Beobachtet:** Hook lud nur `list()` (Cache vom Boot) beim Mount und `refresh()` ausschliesslich auf `window.focus`. Bei Junction als Menüleisten-App: User öffnet Settings über Tray-Icon, kein Focus-Event feuert, Liste zeigt stale Detection-Daten.
+
+**Spec-Verstoss:** Edge-Case "Live-Detection bei jedem Öffnen des Settings-Fensters" nicht erfüllt.
+
+**Fix:** `src/hooks/use-browsers.ts` ruft beim Mount sowohl `list()` (für sofortige Anzeige) als auch `refresh()` (für aktuelle Detection) auf. Window-Focus-Refresh bleibt für laufende Updates während der Nutzung.
+
+**Re-Verify:** Test-Suite 214/214 grün, Browser-Test ohne Console-Errors. Neuer Regressionstest in `electron/browsers.test.ts`: simuliert nachträgliche Brave-Installation und prüft, dass `refresh()` den neuen Browser sofort sichtbar macht.
+
+### Health-Score
+| Kategorie | Score |
+|-----------|-------|
+| Acceptance Criteria | 10/10 (alle erfüllt, 2 Abweichungen explizit dokumentiert) |
+| Edge Cases | 10/10 (alle abgedeckt) |
+| Tests | 10/10 (214/214, +1 Regressionstest) |
+| Code-Qualität | 9/10 (1 Medium-Issue gefunden + gefixt) |
+| **Gesamt** | **96/100** |
+
+### Verdict
+**Approved.** Alle Acceptance Criteria erfüllt, alle Edge Cases verhalten sich wie spezifiziert. Das ISSUE-001 wurde noch im QA-Pass behoben und mit Regressionstest abgesichert. Die zwei dokumentierten Abweichungen vom Original-Spec (Default-Bestätigung statt automatisch an, JsonStore statt electron-store-Library) sind bewusste Designentscheidungen, im Tech-Design begründet.
 
 ## Deployment
 _To be added by /deploy_
