@@ -17,7 +17,7 @@ export function AppSidebar() {
 
   return (
     <aside className="flex h-full w-56 flex-col border-r bg-sidebar">
-      <div className="flex h-14 items-center gap-2 px-5">
+      <div className="flex h-20 items-start gap-2 px-5 pt-[46px]">
         <BrandMark size={24} showWordmark />
       </div>
       <nav className="flex flex-1 flex-col gap-0.5 px-3 py-2">
