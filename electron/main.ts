@@ -16,6 +16,7 @@ import {
 } from './sync-engine';
 import { SyncService, type SyncState } from './sync';
 import { SyncTrigger, createDnsProbe, createElectronNotifier } from './sync-trigger';
+import { BrowsersService, migrateSettingsV1ToV2 } from './browsers';
 
 const PROTOCOL = 'junction';
 let pendingDeepLink: string | null = null;
@@ -75,6 +76,11 @@ async function boot(): Promise<void> {
   const appStateStore = new JsonStore<AppState>('app-state.json', AppStateSchema, defaultAppState);
   const settingsStore = new JsonStore<Settings>('settings.json', SettingsSchema, defaultSettings);
 
+  // BrowsersService must exist before the v1→v2 migration so we can pre-fill
+  // enabledBrowsers / acknowledgedBrowsers with currently-detected IDs.
+  const browsersService = new BrowsersService(settingsStore);
+  migrateSettingsV1ToV2(settingsStore, browsersService);
+
   configureAutoLaunch(settingsStore.get().autoLaunch);
 
   authService = new AuthService(configResult.config);
@@ -90,7 +96,7 @@ async function boot(): Promise<void> {
     drivers: createRealDrivers({ userDataDir: app.getPath('userData') }),
     logStore: createLogStore(app.getPath('userData')),
   });
-  const syncService = new SyncService(syncEngine, authService);
+  const syncService = new SyncService(syncEngine, authService, settingsStore);
 
   // Mirror sync state to AppState so Renderer subscribers (popover, header,
   // tray) see run progress regardless of who triggered the sync (tray click,
@@ -128,6 +134,7 @@ async function boot(): Promise<void> {
     auth: authService,
     permissions: permissionsService,
     sync: syncService,
+    browsers: browsersService,
     getAllWindows: () => BrowserWindow.getAllWindows(),
   });
 

@@ -1,9 +1,10 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AppState, Settings } from './state';
+import type { AppState, BrowserId, Settings } from './state';
 import type { AuthStatus } from './auth';
 import type { PermissionStatus, PermissionsState } from './permissions';
 import type { SyncState } from './sync';
 import type { SyncRunResult } from './sync-engine';
+import type { BrowserStatus } from './browsers';
 
 export type AuthRequestResult = { ok: true } | { ok: false; message: string };
 
@@ -38,7 +39,16 @@ export type JunctionBridge = {
   sync: {
     getState: () => Promise<SyncState>;
     run: (triggeredBy: 'manual' | 'auto' | 'restore') => Promise<SyncRunResult>;
+    awaitIdle: () => Promise<void>;
     subscribe: (listener: (state: SyncState) => void) => () => void;
+  };
+  browsers: {
+    list: () => Promise<BrowserStatus[]>;
+    refresh: () => Promise<BrowserStatus[]>;
+    setEnabled: (browserId: BrowserId, enabled: boolean) => Promise<void>;
+    acknowledge: (browserId: BrowserId) => Promise<void>;
+    openPermissions: (browserId: BrowserId) => Promise<void>;
+    subscribe: (listener: (list: BrowserStatus[]) => void) => () => void;
   };
   app: {
     quit: () => Promise<void>;
@@ -94,10 +104,25 @@ const bridge: JunctionBridge = {
   sync: {
     getState: () => ipcRenderer.invoke('sync:state:get'),
     run: (triggeredBy) => ipcRenderer.invoke('sync:run', triggeredBy),
+    awaitIdle: () => ipcRenderer.invoke('sync:await-idle'),
     subscribe: (listener) => {
       const handler = (_: unknown, state: SyncState) => listener(state);
       ipcRenderer.on('sync:state:changed', handler);
       return () => ipcRenderer.removeListener('sync:state:changed', handler);
+    },
+  },
+  browsers: {
+    list: () => ipcRenderer.invoke('browsers:list'),
+    refresh: () => ipcRenderer.invoke('browsers:refresh'),
+    setEnabled: (browserId, enabled) =>
+      ipcRenderer.invoke('browsers:set-enabled', browserId, enabled),
+    acknowledge: (browserId) => ipcRenderer.invoke('browsers:acknowledge', browserId),
+    openPermissions: (browserId) =>
+      ipcRenderer.invoke('browsers:open-permissions', browserId),
+    subscribe: (listener) => {
+      const handler = (_: unknown, list: BrowserStatus[]) => listener(list);
+      ipcRenderer.on('browsers:changed', handler);
+      return () => ipcRenderer.removeListener('browsers:changed', handler);
     },
   },
   app: {

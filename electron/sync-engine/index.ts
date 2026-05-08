@@ -11,7 +11,7 @@ import { createSupabaseCloudClient, type CloudClient } from './cloud';
 import { createRealDrivers, type BrowserDriver, type DriverDeps } from './drivers';
 import { createLogStore, type LogStore } from './log';
 import { runPipeline } from './pipeline';
-import type { SyncRunResult } from './types';
+import type { BrowserId, SyncRunResult } from './types';
 
 export type SyncEngineDeps = {
   cloud: CloudClient;
@@ -22,6 +22,8 @@ export type SyncEngineDeps = {
 export type RunSyncOptions = {
   userId: string;
   triggeredBy: 'manual' | 'auto' | 'restore';
+  /** When set, only browsers in this list participate in the run. */
+  enabledBrowserIds?: BrowserId[];
 };
 
 export class SyncEngine {
@@ -50,6 +52,7 @@ export class SyncEngine {
         cloud: this.deps.cloud,
         drivers: this.deps.drivers,
         logStore: this.deps.logStore,
+        enabledBrowserIds: options.enabledBrowserIds,
       });
       this.lastResult = result;
       return result;

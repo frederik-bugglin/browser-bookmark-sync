@@ -20,11 +20,13 @@ const FALLBACK_STATE: AppState = {
 };
 
 const FALLBACK_SETTINGS: Settings = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   autoLaunch: true,
   autoSyncEnabled: true,
   autoSyncIntervalMin: 15,
   notifyOnSyncError: false,
+  enabledBrowsers: [],
+  acknowledgedBrowsers: [],
 };
 
 export function PopoverShell() {

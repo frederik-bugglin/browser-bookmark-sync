@@ -2,27 +2,20 @@
 
 import { Check, MinusCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useBrowsers } from '@/hooks/use-browsers';
 import type { BrowserStatus } from '@/lib/types';
 
-const PLACEHOLDER_BROWSERS: BrowserStatus[] = [
-  { id: 'chrome', name: 'Chrome', installed: true, detected: true, permissionsOk: true, enabled: true },
-  { id: 'safari', name: 'Safari', installed: true, detected: false, permissionsOk: false, enabled: true },
-  { id: 'firefox', name: 'Firefox', installed: true, detected: true, permissionsOk: true, enabled: true },
-  { id: 'arc', name: 'Arc', installed: true, detected: true, permissionsOk: true, enabled: true },
-  { id: 'brave', name: 'Brave', installed: false, detected: false, permissionsOk: true, enabled: false },
-  { id: 'edge', name: 'Edge', installed: false, detected: false, permissionsOk: true, enabled: false },
-  { id: 'zen', name: 'Zen', installed: false, detected: false, permissionsOk: true, enabled: false },
-  { id: 'dia', name: 'Dia', installed: false, detected: false, permissionsOk: true, enabled: false },
-];
-
 export function BrowserListCompact({
-  browsers = PLACEHOLDER_BROWSERS,
+  browsers,
 }: {
   browsers?: BrowserStatus[];
 }) {
+  const live = useBrowsers();
+  // Show acknowledged browsers — the "Neu erkannt"-flow lives in Settings.
+  const data = browsers ?? live.filter((b) => b.acknowledged);
   return (
     <ul className="flex flex-col gap-1.5">
-      {browsers.map((browser) => (
+      {data.map((browser) => (
         <li
           key={browser.id}
           className={cn(

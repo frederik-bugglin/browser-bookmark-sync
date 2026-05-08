@@ -1,12 +1,13 @@
 import { ipcMain, shell, app } from 'electron';
 import type { BrowserWindow } from 'electron';
 import type { JsonStore } from './store';
-import { AppStateSchema, SettingsSchema, type AppState, type Settings } from './state';
+import { AppStateSchema, SettingsSchema, BrowserIdSchema, type AppState, type BrowserId, type Settings } from './state';
 import type { WindowManager } from './windows';
 import { configureAutoLaunch } from './autolaunch';
 import type { AuthService, AuthStatus } from './auth';
 import type { PermissionsService, PermissionsState } from './permissions';
 import type { SyncService, SyncState } from './sync';
+import type { BrowsersService, BrowserStatus } from './browsers';
 
 type Deps = {
   appStateStore: JsonStore<AppState>;
@@ -15,10 +16,11 @@ type Deps = {
   auth: AuthService;
   permissions: PermissionsService;
   sync: SyncService;
+  browsers: BrowsersService;
   getAllWindows: () => BrowserWindow[];
 };
 
-export function registerIpcHandlers({ appStateStore, settingsStore, windows, auth, permissions, sync, getAllWindows }: Deps): void {
+export function registerIpcHandlers({ appStateStore, settingsStore, windows, auth, permissions, sync, browsers, getAllWindows }: Deps): void {
   ipcMain.handle('app:state:get', () => appStateStore.get());
 
   ipcMain.handle('app:state:set', (_e, patch: unknown) => {
@@ -72,6 +74,42 @@ export function registerIpcHandlers({ appStateStore, settingsStore, windows, aut
       : 'manual';
     return sync.run(t);
   });
+  ipcMain.handle('sync:await-idle', () => sync.awaitIdle());
+
+  ipcMain.handle('browsers:list', () => browsers.list());
+  ipcMain.handle('browsers:refresh', () => browsers.refresh());
+  ipcMain.handle('browsers:open-permissions', async (_e, browserId: unknown) => {
+    const parsed = BrowserIdSchema.safeParse(browserId);
+    if (!parsed.success) throw new Error('Invalid browser id');
+    if (parsed.data === 'safari') {
+      return permissions.openSafariSettings();
+    }
+    // Other browsers don't currently require an explicit permission flow.
+  });
+  ipcMain.handle('browsers:set-enabled', (_e, browserId: unknown, enabled: unknown) => {
+    const parsed = BrowserIdSchema.safeParse(browserId);
+    if (!parsed.success) throw new Error('Invalid browser id');
+    if (typeof enabled !== 'boolean') throw new Error('enabled must be boolean');
+    const id = parsed.data;
+    const current = settingsStore.get();
+    const enabledSet = new Set<BrowserId>(current.enabledBrowsers);
+    const ackSet = new Set<BrowserId>(current.acknowledgedBrowsers);
+    if (enabled) enabledSet.add(id);
+    else enabledSet.delete(id);
+    ackSet.add(id);
+    settingsStore.set({
+      enabledBrowsers: [...enabledSet],
+      acknowledgedBrowsers: [...ackSet],
+    });
+  });
+  ipcMain.handle('browsers:acknowledge', (_e, browserId: unknown) => {
+    const parsed = BrowserIdSchema.safeParse(browserId);
+    if (!parsed.success) throw new Error('Invalid browser id');
+    const current = settingsStore.get();
+    const ackSet = new Set<BrowserId>(current.acknowledgedBrowsers);
+    ackSet.add(parsed.data);
+    settingsStore.set({ acknowledgedBrowsers: [...ackSet] });
+  });
 
   // During shutdown, webContents can be destroyed before the BrowserWindow
   // itself reports isDestroyed() = true. We need to guard both checks AND
@@ -96,4 +134,5 @@ export function registerIpcHandlers({ appStateStore, settingsStore, windows, aut
   auth.on('change', (status: AuthStatus) => broadcast('auth:status:changed', status));
   permissions.on('change', (state: PermissionsState) => broadcast('permissions:state:changed', state));
   sync.on('change', (state: SyncState) => broadcast('sync:state:changed', state));
+  browsers.on('change', (list: BrowserStatus[]) => broadcast('browsers:changed', list));
 }

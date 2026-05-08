@@ -17,11 +17,13 @@ export type AppState = {
 export type AutoSyncIntervalMin = 5 | 15 | 30 | 60;
 
 export type Settings = {
-  schemaVersion: 1;
+  schemaVersion: 1 | 2;
   autoLaunch: boolean;
   autoSyncEnabled: boolean;
   autoSyncIntervalMin: AutoSyncIntervalMin;
   notifyOnSyncError: boolean;
+  enabledBrowsers: BrowserId[];
+  acknowledgedBrowsers: BrowserId[];
 };
 
 export type BrowserId =
@@ -41,6 +43,7 @@ export type BrowserStatus = {
   detected: boolean;
   permissionsOk: boolean;
   enabled: boolean;
+  acknowledged: boolean;
 };
 
 export type AuthStatus =

@@ -8,15 +8,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { SettingsSyncSection } from '@/components/settings-sync-section';
+import { SettingsBrowsersCard } from '@/components/settings-browsers-card';
 import { junction } from '@/lib/electron-bridge';
 import type { AppState, AuthStatus, Settings } from '@/lib/types';
 
 const FALLBACK: Settings = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   autoLaunch: true,
   autoSyncEnabled: true,
   autoSyncIntervalMin: 15,
   notifyOnSyncError: false,
+  enabledBrowsers: [],
+  acknowledgedBrowsers: [],
 };
 const FALLBACK_AUTH: AuthStatus = { state: 'loading' };
 const FALLBACK_APP_STATE: AppState = {
@@ -68,6 +71,10 @@ export default function SettingsPage() {
 
   const handleSignOut = async () => {
     setSigningOut(true);
+    // Wait for any active sync to settle so we don't sign out mid-pipeline,
+    // which would corrupt the in-flight cloud upsert. UX: button shows
+    // "Abmelden..." until idle, then signs out.
+    await junction().sync.awaitIdle();
     await junction().auth.signOut();
     await junction().window.showOnboarding();
     setSigningOut(false);
@@ -79,7 +86,7 @@ export default function SettingsPage() {
         <header>
           <h1 className="text-2xl font-semibold tracking-tight">Einstellungen</h1>
           <p className="text-sm text-muted-foreground">
-            Account, App-Verhalten und Synchronisation. Browser-Auswahl folgt in PROJ-8.
+            Account, beteiligte Browser, Synchronisation und App-Verhalten.
           </p>
         </header>
 
@@ -114,6 +121,14 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
+        <SettingsBrowsersCard />
+
+        <SettingsSyncSection
+          settings={settings}
+          appState={appState}
+          onChange={handleSyncSettingsChange}
+        />
+
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Allgemein</CardTitle>
@@ -131,20 +146,13 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        <SettingsSyncSection
-          settings={settings}
-          appState={appState}
-          onChange={handleSyncSettingsChange}
-        />
-
         <Card className="border-dashed">
           <CardHeader>
             <CardTitle className="text-base">Folgt in späteren Schritten</CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
             <ul className="flex flex-col gap-1.5">
-              <li>– Browser-Auswahl pro Sync (PROJ-8)</li>
-              <li>– Konflikt-Log mit Wiederherstellung (PROJ-9)</li>
+              <li>Konflikt-Log mit Wiederherstellung (PROJ-9)</li>
             </ul>
           </CardContent>
         </Card>

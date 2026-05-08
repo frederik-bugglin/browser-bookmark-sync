@@ -27,6 +27,8 @@ export type PipelineDeps = {
   logStore: LogStore;
   /** "manual" (user clicked sync), "auto" (timer triggered), "restore" (PROJ-9 restore action). */
   triggeredBy: 'manual' | 'auto' | 'restore';
+  /** Optional whitelist; when provided, only drivers with these IDs participate. */
+  enabledBrowserIds?: BrowserId[];
   /** Optional injection for tests; defaults to new Date(). */
   now?: () => Date;
 };
@@ -44,9 +46,17 @@ export async function runPipeline(deps: PipelineDeps): Promise<SyncRunResult> {
   let planResults: BrowserPlan[] = [];
   let resolved: ReturnType<typeof resolveChanges> | null = null;
 
+  // Drivers may be filtered by user-toggled "enabledBrowsers" from settings.
+  // Keep `allDrivers` for cloud-write phases that need to know all drivers
+  // (currently only via findDriver below; filter applies to plan onwards).
+  const activeDrivers =
+    deps.enabledBrowserIds === undefined
+      ? deps.drivers
+      : deps.drivers.filter((d) => deps.enabledBrowserIds!.includes(d.browserId));
+
   try {
   // -------- Phase 1: PLAN --------
-  planResults = deps.drivers.map((d) => d.plan());
+  planResults = activeDrivers.map((d) => d.plan());
   const eligible = planResults.filter(
     (p): p is EligibleBrowser => p.reason === 'eligible',
   );
@@ -60,7 +70,7 @@ export async function runPipeline(deps: PipelineDeps): Promise<SyncRunResult> {
   const readableBrowsers: EligibleBrowser[] = [];
 
   for (const browserPlan of eligible) {
-    const driver = findDriver(deps.drivers, browserPlan.browserId);
+    const driver = findDriver(activeDrivers, browserPlan.browserId);
     if (!driver) continue;
     const t0 = Date.now();
     try {
@@ -137,7 +147,7 @@ export async function runPipeline(deps: PipelineDeps): Promise<SyncRunResult> {
   // -------- Phase 6: WRITE ADAPTERS --------
   const writeOk = new Set<BrowserId>();
   for (const browserPlan of readableBrowsers) {
-    const driver = findDriver(deps.drivers, browserPlan.browserId);
+    const driver = findDriver(activeDrivers, browserPlan.browserId);
     if (!driver) continue;
     const targetSnapshot = projectSnapshotFor(
       driver.browserId,
@@ -171,7 +181,7 @@ export async function runPipeline(deps: PipelineDeps): Promise<SyncRunResult> {
 
   // -------- Phase 7: RE-READ SAFARI --------
   if (writeOk.has('safari')) {
-    const safariDriver = findDriver(deps.drivers, 'safari');
+    const safariDriver = findDriver(activeDrivers, 'safari');
     if (safariDriver?.reread) {
       const t0 = Date.now();
       try {
