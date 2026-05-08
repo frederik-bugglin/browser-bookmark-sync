@@ -1,8 +1,8 @@
 # PROJ-7: Sync-Trigger (manuell und automatisch)
 
-## Status: In Progress
+## Status: Approved (mit Vorbehalt)
 **Created:** 2026-05-06
-**Last Updated:** 2026-05-08 (Frontend + Backend gebaut, /qa pending)
+**Last Updated:** 2026-05-08 (QA Standard-Tier abgeschlossen, 4 Live-Verifikationspunkte pending)
 
 ## Dependencies
 - PROJ-1 (Electron-Shell) für Tray-UI
@@ -406,7 +406,36 @@ SyncTrigger (lebt im Main-Prozess, instanziiert in main.ts)
 - Offline-Skip: WLAN aus, 5 min warten, Status wird `skipped-offline`, kein Error-Log
 
 ## QA Test Results
-_To be added by /qa_
+
+**Datum:** 2026-05-08
+**Tier:** Standard
+**Health Score:** 94/100
+**Bericht:** `.gstack/qa-reports/qa-report-junction-PROJ-7-2026-05-08.md`
+
+**Resultat:**
+
+- 8/9 Acceptance Criteria verifiziert (Code, Browse-QA, Unit-Tests, Live durch Frederik). AC #6 (chokidar File-Watcher) explizit out-of-scope per Architektur-Decision
+- 21 neue Trigger-Tests grün, gesamt 205/205
+- Renderer-QA via browse: keine Console-Errors, alle Pill- und Footer-Transitionen sauber, Toggle-Verhalten persistent über Routen-Wechsel
+- Build, TypeCheck, Electron-Compile alle clean
+- Keine Critical/High/Medium/Low-Bugs gefunden
+
+**Architektur-Erweiterungen über Spec hinaus (verifiziert):**
+
+- 60s-Online-Monitor für Offline-Detection ≤60s (statt nächster Sync-Tick)
+- `pendingRecovery`-Flag für sofortiges Recovery bei Offline→Online ODER nach Sync-Fehler
+
+**Live-Verifikation pending (nicht blockierend):**
+
+1. Tray-Title `· syncing` während Sync sichtbar in macOS-Menubar
+2. macOS-Notification erscheint bei Sync-Error mit Toggle on (inkl. Permission-Flow)
+3. Echter 5-min-Auto-Tick feuert (eine Stunde mit `autoSyncIntervalMin=5` laufen lassen)
+4. Sleep/Wake ohne Sync-Storm (Mac-Lid schliessen/öffnen)
+
+Frederik hat im Verlauf der Implementation bereits live verifiziert: Offline-Detection ≤60s, Footer-Hint `Sync pausiert · offline`, Recovery beim Online-Wiederherstellen.
+
+## Deployment
+_To be added by /deploy_
 
 ## Deployment
 _To be added by /deploy_
