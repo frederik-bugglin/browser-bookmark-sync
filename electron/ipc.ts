@@ -1,4 +1,4 @@
-import { ipcMain, shell, app } from 'electron';
+import { ipcMain, app } from 'electron';
 import type { BrowserWindow } from 'electron';
 import type { JsonStore } from './store';
 import { AppStateSchema, SettingsSchema, BrowserIdSchema, type AppState, type BrowserId, type Settings } from './state';
@@ -10,6 +10,7 @@ import type { SyncService, SyncState } from './sync';
 import type { BrowsersService, BrowserStatus } from './browsers';
 import type { ConflictsService } from './conflicts';
 import type { ConflictFilter } from './conflicts/types';
+import { safeOpenExternal } from './safe-open-external';
 
 type Deps = {
   appStateStore: JsonStore<AppState>;
@@ -49,9 +50,9 @@ export function registerIpcHandlers({ appStateStore, settingsStore, windows, aut
   ipcMain.handle('window:show-onboarding', () => windows.showOnboarding());
 
   ipcMain.handle('app:quit', () => app.quit());
-  ipcMain.handle('app:open-external', (_e, url: unknown) => {
+  ipcMain.handle('app:open-external', async (_e, url: unknown) => {
     if (typeof url !== 'string') throw new Error('URL must be a string');
-    return shell.openExternal(url);
+    await safeOpenExternal(url);
   });
 
   ipcMain.handle('auth:status:get', () => auth.getStatus());

@@ -2,6 +2,31 @@ import { BrowserWindow, screen, type Rectangle } from 'electron';
 import type { JsonStore } from './store';
 import type { AppState } from './state';
 import { isDev, preloadPath, rendererURL } from './paths';
+import { isSafeExternalUrl, safeOpenExternal } from './safe-open-external';
+
+// Allowed origins for in-window navigation. Anything else is blocked; safe
+// http(s) URLs are routed to the user's external browser via shell.openExternal.
+const RENDERER_DEV_ORIGIN = 'http://localhost:3000';
+
+function isAllowedInternalUrl(url: string): boolean {
+  if (url.startsWith('file://')) return true;
+  if (url.startsWith(`${RENDERER_DEV_ORIGIN}/`) || url === RENDERER_DEV_ORIGIN) return true;
+  return false;
+}
+
+// Block in-window navigation to external sites and pop-ups. External http(s)
+// links are opened in the user's default browser; everything else is denied.
+function lockDownNavigation(win: BrowserWindow): void {
+  win.webContents.on('will-navigate', (event, url) => {
+    if (isAllowedInternalUrl(url)) return;
+    event.preventDefault();
+    if (isSafeExternalUrl(url)) void safeOpenExternal(url);
+  });
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (isSafeExternalUrl(url)) void safeOpenExternal(url);
+    return { action: 'deny' };
+  });
+}
 
 const MAIN_DEFAULTS = { width: 960, height: 640 };
 const POPOVER_SIZE = { width: 360, height: 460 };
@@ -42,6 +67,8 @@ export class WindowManager {
         sandbox: true,
       },
     });
+
+    lockDownNavigation(win);
 
     win.on('close', (event) => {
       if (!this.isQuitting) {
@@ -101,6 +128,8 @@ export class WindowManager {
         sandbox: true,
       },
     });
+
+    lockDownNavigation(win);
 
     this.positionPopover(win, trayBounds);
 

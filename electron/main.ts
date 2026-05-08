@@ -18,6 +18,7 @@ import { SyncService, type SyncState } from './sync';
 import { SyncTrigger, createDnsProbe, createElectronNotifier } from './sync-trigger';
 import { BrowsersService, migrateSettingsV1ToV2 } from './browsers';
 import { ConflictsService } from './conflicts';
+import { installCsp } from './csp';
 
 const PROTOCOL = 'junction';
 let pendingDeepLink: string | null = null;
@@ -61,6 +62,8 @@ async function handleDeepLink(url: string): Promise<void> {
 
 async function boot(): Promise<void> {
   await app.whenReady();
+
+  installCsp();
 
   if (process.platform === 'darwin') app.dock?.hide();
 
