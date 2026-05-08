@@ -1,8 +1,8 @@
 # PROJ-6: Sync-Engine
 
-## Status: In Review
+## Status: Approved
 **Created:** 2026-05-06
-**Last Updated:** 2026-05-07 (QA Pre-Migration Pass, 2 HIGH-Bugs gefixt, Live-Sync-Addendum offen)
+**Last Updated:** 2026-05-08 (Live-Sync gegen Chrome+Firefox+Zen verifiziert, 9 weitere Bugs gefixt, Steady-State stabil, Health 94/100)
 
 ## Dependencies
 - PROJ-2 (Supabase Backend) für Cloud-State-Persistenz
