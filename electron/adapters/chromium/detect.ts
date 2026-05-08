@@ -19,6 +19,8 @@ export type DetectedBrowser = {
   hasDefaultProfile: boolean;
   profileDir: string;
   bookmarksPath: string;
+  /** Where SingletonLock lives (parent of profileDir). Used for live lock re-checks. */
+  userDataRoot: string;
   lock: LockState;
 };
 
@@ -76,6 +78,7 @@ export function detectBrowser(config: ChromiumBrowserConfig): DetectedBrowser {
     hasDefaultProfile,
     profileDir,
     bookmarksPath,
+    userDataRoot: config.profileBaseDir,
     // SingletonLock lives in the user-data root (one level up from "Default"),
     // not in the profile sub-directory. Checking the wrong path silently
     // returned "no-lock" while the browser was actually running, which let

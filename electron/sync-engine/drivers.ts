@@ -91,10 +91,13 @@ function chromiumDriver(
     plan() {
       if (!detected.installed) return { browserId, reason: 'not-installed' };
       if (!detected.hasDefaultProfile) return { browserId, reason: 'no-default-profile' };
-      // Writing while Chrome is running silently corrupts data: Chrome holds
-      // the bookmark JSON in memory and writes it back over our edits when it
-      // detects the file changed. Skip the whole sync for this browser.
-      if (detected.lock.running) {
+      // Re-check the lock live each plan call. detected.lock is a snapshot
+      // from app start; if the user closes Chrome mid-session it would still
+      // report running. Writing while Chrome is running silently corrupts
+      // data because Chrome holds the bookmark JSON in memory and writes
+      // it back over our edits when it detects the file changed.
+      const lock = chromium.checkLock(detected.userDataRoot);
+      if (lock.running) {
         return {
           browserId,
           reason: 'browser-running-write',
@@ -130,13 +133,15 @@ function firefoxDriver(
     plan() {
       if (!detected.installed) return { browserId, reason: 'not-installed' };
       if (!detected.hasDefaultProfile) return { browserId, reason: 'no-default-profile' };
-      // Lock state matters here: Firefox holds a process lock on the
-      // profile, and writing while it's held is destructive.
-      if (detected.lock.running) {
+      // Re-check live each plan call (see chromium driver for rationale).
+      // Firefox holds a process lock on the profile, and writing while it's
+      // held is destructive.
+      const lock = firefox.checkLock(detected.profileDir);
+      if (lock.running) {
         return {
           browserId,
           reason: 'browser-running-write',
-          detail: 'Firefox holds the profile lock; close Firefox to sync.',
+          detail: `${detected.name} holds the profile lock; close it to sync.`,
         };
       }
       return { browserId, reason: 'eligible' };
@@ -177,7 +182,8 @@ function safariDriver(
       if (detected.permission === 'unavailable') {
         return { browserId, reason: 'no-default-profile' };
       }
-      if (detected.lock.running) {
+      const lock = safari.checkSafariRunning();
+      if (lock.running) {
         return {
           browserId,
           reason: 'browser-running-write',
