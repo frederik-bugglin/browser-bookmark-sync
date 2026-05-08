@@ -11,11 +11,12 @@ import { useNextSyncLabel } from '@/hooks/use-next-sync-label';
 import type { AppState, Settings } from '@/lib/types';
 
 const FALLBACK_STATE: AppState = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   firstLaunchDone: true,
   lastSyncAt: null,
   lastSyncStatus: 'idle',
   nextScheduledSyncAt: null,
+  lastConflictsSeenAt: null,
   mainWindowBounds: null,
 };
 

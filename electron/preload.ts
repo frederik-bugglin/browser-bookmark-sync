@@ -5,6 +5,12 @@ import type { PermissionStatus, PermissionsState } from './permissions';
 import type { SyncState } from './sync';
 import type { SyncRunResult } from './sync-engine';
 import type { BrowserStatus } from './browsers';
+import type {
+  ConflictEntry,
+  ConflictFilter,
+  ConflictListResult,
+  RestoreResult,
+} from './conflicts/types';
 
 export type AuthRequestResult = { ok: true } | { ok: false; message: string };
 
@@ -49,6 +55,15 @@ export type JunctionBridge = {
     acknowledge: (browserId: BrowserId) => Promise<void>;
     openPermissions: (browserId: BrowserId) => Promise<void>;
     subscribe: (listener: (list: BrowserStatus[]) => void) => () => void;
+  };
+  conflicts: {
+    list: (filter: ConflictFilter) => Promise<ConflictListResult>;
+    getById: (id: string) => Promise<ConflictEntry | null>;
+    countSinceLastSeen: () => Promise<number>;
+    markSeen: () => Promise<void>;
+    restore: (id: string) => Promise<RestoreResult>;
+    dismiss: (id: string) => Promise<void>;
+    subscribe: (listener: () => void) => () => void;
   };
   app: {
     quit: () => Promise<void>;
@@ -123,6 +138,19 @@ const bridge: JunctionBridge = {
       const handler = (_: unknown, list: BrowserStatus[]) => listener(list);
       ipcRenderer.on('browsers:changed', handler);
       return () => ipcRenderer.removeListener('browsers:changed', handler);
+    },
+  },
+  conflicts: {
+    list: (filter) => ipcRenderer.invoke('conflicts:list', filter),
+    getById: (id) => ipcRenderer.invoke('conflicts:get-by-id', id),
+    countSinceLastSeen: () => ipcRenderer.invoke('conflicts:count-since-last-seen'),
+    markSeen: () => ipcRenderer.invoke('conflicts:mark-seen'),
+    restore: (id) => ipcRenderer.invoke('conflicts:restore', id),
+    dismiss: (id) => ipcRenderer.invoke('conflicts:dismiss', id),
+    subscribe: (listener) => {
+      const handler = () => listener();
+      ipcRenderer.on('conflicts:changed', handler);
+      return () => ipcRenderer.removeListener('conflicts:changed', handler);
     },
   },
   app: {

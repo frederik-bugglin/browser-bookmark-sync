@@ -4,8 +4,12 @@ import type {
   AuthStatus,
   BrowserId,
   BrowserStatus,
+  ConflictEntry,
+  ConflictFilter,
+  ConflictListResult,
   PermissionStatus,
   PermissionsState,
+  RestoreResult,
   Settings,
   SyncEngineState,
   SyncRunSummary,
@@ -55,6 +59,15 @@ type Bridge = {
     openPermissions: (browserId: BrowserId) => Promise<void>;
     subscribe: (listener: (list: BrowserStatus[]) => void) => () => void;
   };
+  conflicts: {
+    list: (filter: ConflictFilter) => Promise<ConflictListResult>;
+    getById: (id: string) => Promise<ConflictEntry | null>;
+    countSinceLastSeen: () => Promise<number>;
+    markSeen: () => Promise<void>;
+    restore: (id: string) => Promise<RestoreResult>;
+    dismiss: (id: string) => Promise<void>;
+    subscribe: (listener: () => void) => () => void;
+  };
   app: {
     quit: () => Promise<void>;
     openExternal: (url: string) => Promise<void>;
@@ -69,11 +82,12 @@ declare global {
 }
 
 const FALLBACK_APP_STATE: AppState = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   firstLaunchDone: false,
   lastSyncAt: null,
   lastSyncStatus: 'idle',
   nextScheduledSyncAt: null,
+  lastConflictsSeenAt: null,
   mainWindowBounds: null,
 };
 
@@ -86,6 +100,102 @@ const FALLBACK_SETTINGS: Settings = {
   enabledBrowsers: [],
   acknowledgedBrowsers: [],
 };
+
+const MOCK_CONFLICTS: ConflictEntry[] = [
+  {
+    id: 'mock-conflict-1',
+    bookmarkHash: 'h1',
+    winnerVersion: {
+      id: 'b1',
+      url: 'https://www.anthropic.com/news/claude-4-7',
+      urlNormalized: 'https://www.anthropic.com/news/claude-4-7',
+      title: 'Claude 4.7 Release Notes',
+      folderPath: '/lesezeichenleiste/recherche',
+      rootKey: 'toolbar',
+      dateAdded: '2026-04-12T10:00:00.000Z',
+      dateModified: '2026-05-07T18:30:00.000Z',
+    },
+    loserVersion: {
+      id: 'b1',
+      url: 'https://www.anthropic.com/news/claude-4-7',
+      urlNormalized: 'https://www.anthropic.com/news/claude-4-7',
+      title: 'Claude 4.7 Release',
+      folderPath: '/lesezeichenleiste/recherche/ai',
+      rootKey: 'toolbar',
+      dateAdded: '2026-04-12T10:00:00.000Z',
+      dateModified: '2026-05-07T17:45:00.000Z',
+    },
+    winnerBrowserId: 'firefox',
+    loserBrowserId: 'chrome',
+    syncRunId: '00000000-0000-0000-0000-000000000001',
+    status: 'open',
+    createdAt: '2026-05-07T18:30:01.000Z',
+    resolvedAt: null,
+    restoreOriginId: null,
+  },
+  {
+    id: 'mock-conflict-2',
+    bookmarkHash: 'h2',
+    winnerVersion: {
+      id: 'b2',
+      url: 'https://nextjs.org/docs/app',
+      urlNormalized: 'https://nextjs.org/docs/app',
+      title: 'Next.js App Router',
+      folderPath: '/lesezeichenleiste/dev',
+      rootKey: 'toolbar',
+      dateAdded: '2026-03-01T09:00:00.000Z',
+      dateModified: '2026-05-06T14:00:00.000Z',
+    },
+    loserVersion: {
+      id: 'b2',
+      url: 'https://nextjs.org/docs/app',
+      urlNormalized: 'https://nextjs.org/docs/app',
+      title: 'Next.js Docs',
+      folderPath: '/lesezeichenleiste/dev',
+      rootKey: 'toolbar',
+      dateAdded: '2026-03-01T09:00:00.000Z',
+      dateModified: '2026-05-06T13:50:00.000Z',
+    },
+    winnerBrowserId: 'chrome',
+    loserBrowserId: 'zen',
+    syncRunId: '00000000-0000-0000-0000-000000000002',
+    status: 'restored',
+    createdAt: '2026-05-06T14:00:01.000Z',
+    resolvedAt: '2026-05-06T14:05:00.000Z',
+    restoreOriginId: null,
+  },
+  {
+    id: 'mock-conflict-3',
+    bookmarkHash: 'h3',
+    winnerVersion: {
+      id: 'b3',
+      url: 'https://tailwindcss.com/docs/installation',
+      urlNormalized: 'https://tailwindcss.com/docs/installation',
+      title: 'Tailwind CSS Setup',
+      folderPath: '/lesezeichenleiste/dev/css',
+      rootKey: 'toolbar',
+      dateAdded: '2026-02-15T11:00:00.000Z',
+      dateModified: '2026-05-05T09:00:00.000Z',
+    },
+    loserVersion: {
+      id: 'b3',
+      url: 'https://tailwindcss.com/docs/installation',
+      urlNormalized: 'https://tailwindcss.com/docs/installation',
+      title: 'Install Tailwind',
+      folderPath: '/lesezeichenleiste/css',
+      rootKey: 'toolbar',
+      dateAdded: '2026-02-15T11:00:00.000Z',
+      dateModified: '2026-05-05T08:55:00.000Z',
+    },
+    winnerBrowserId: 'firefox',
+    loserBrowserId: 'arc',
+    syncRunId: '00000000-0000-0000-0000-000000000003',
+    status: 'dismissed',
+    createdAt: '2026-05-05T09:00:01.000Z',
+    resolvedAt: '2026-05-05T09:10:00.000Z',
+    restoreOriginId: null,
+  },
+];
 
 const MOCK_BROWSERS: BrowserStatus[] = [
   { id: 'chrome', name: 'Google Chrome', installed: true, detected: true, permissionsOk: true, enabled: true, acknowledged: true },
@@ -152,6 +262,8 @@ function createMockBridge(): Bridge {
   let authStatus: AuthStatus = { state: 'unauthenticated' };
   let permissions: PermissionsState = { ...FALLBACK_PERMISSIONS };
   let syncState: SyncEngineState = { ...FALLBACK_SYNC_STATE };
+  let conflicts: ConflictEntry[] = MOCK_CONFLICTS.map((c) => ({ ...c }));
+  const conflictListeners = new Set<() => void>();
   let browsers: BrowserStatus[] = MOCK_BROWSERS.map((b) => ({ ...b }));
   // Mock-Bridge syncs the browser list with settings.enabledBrowsers/acknowledged
   // so the renderer reflects toggle state correctly during browser-dev.
@@ -349,6 +461,87 @@ function createMockBridge(): Bridge {
       subscribe: (l) => {
         browserListeners.add(l);
         return () => browserListeners.delete(l);
+      },
+    },
+    conflicts: {
+      list: async (filter) => {
+        const limit = filter.limit ?? 50;
+        const offset = filter.offset ?? 0;
+        let filtered = [...conflicts].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+        if (filter.status && filter.status !== 'all') {
+          filtered = filtered.filter((c) => c.status === filter.status);
+        }
+        if (filter.winnerBrowserIds?.length) {
+          filtered = filtered.filter((c) => filter.winnerBrowserIds!.includes(c.winnerBrowserId));
+        }
+        if (filter.loserBrowserIds?.length) {
+          filtered = filtered.filter((c) => filter.loserBrowserIds!.includes(c.loserBrowserId));
+        }
+        if (filter.createdFrom) {
+          filtered = filtered.filter((c) => c.createdAt >= filter.createdFrom!);
+        }
+        if (filter.createdTo) {
+          filtered = filtered.filter((c) => c.createdAt <= filter.createdTo!);
+        }
+        if (filter.search?.trim()) {
+          const q = filter.search.toLowerCase();
+          filtered = filtered.filter(
+            (c) =>
+              c.winnerVersion.title.toLowerCase().includes(q) ||
+              c.winnerVersion.url.toLowerCase().includes(q),
+          );
+        }
+        const slice = filtered.slice(offset, offset + limit);
+        const hasMore = filtered.length > offset + limit;
+        return {
+          entries: slice,
+          hasMore,
+          nextOffset: hasMore ? offset + limit : null,
+        };
+      },
+      getById: async (id) => conflicts.find((c) => c.id === id) ?? null,
+      countSinceLastSeen: async () => {
+        const since = appState.lastConflictsSeenAt;
+        return conflicts.filter(
+          (c) => c.status === 'open' && (!since || c.createdAt > since),
+        ).length;
+      },
+      markSeen: async () => {
+        appState = { ...appState, lastConflictsSeenAt: new Date().toISOString() };
+        persist();
+        appStateListeners.forEach((l) => l(appState));
+      },
+      restore: async (id) => {
+        const idx = conflicts.findIndex((c) => c.id === id);
+        if (idx < 0) {
+          return { ok: false, reason: 'unknown' as const, message: 'Konflikt nicht gefunden.' };
+        }
+        if (conflicts[idx].status !== 'open') {
+          return {
+            ok: false,
+            reason: 'not-open' as const,
+            message: 'Bereits bearbeitet.',
+          };
+        }
+        conflicts = conflicts.map((c, i) =>
+          i === idx
+            ? { ...c, status: 'restored' as const, resolvedAt: new Date().toISOString() }
+            : c,
+        );
+        conflictListeners.forEach((l) => l());
+        return { ok: true };
+      },
+      dismiss: async (id) => {
+        conflicts = conflicts.map((c) =>
+          c.id === id
+            ? { ...c, status: 'dismissed' as const, resolvedAt: new Date().toISOString() }
+            : c,
+        );
+        conflictListeners.forEach((l) => l());
+      },
+      subscribe: (l) => {
+        conflictListeners.add(l);
+        return () => conflictListeners.delete(l);
       },
     },
     app: {

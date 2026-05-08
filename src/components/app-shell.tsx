@@ -7,11 +7,12 @@ import { junction } from '@/lib/electron-bridge';
 import type { AppState } from '@/lib/types';
 
 const FALLBACK_STATE: AppState = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   firstLaunchDone: true,
   lastSyncAt: null,
   lastSyncStatus: 'idle',
   nextScheduledSyncAt: null,
+  lastConflictsSeenAt: null,
   mainWindowBounds: null,
 };
 

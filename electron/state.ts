@@ -9,12 +9,16 @@ export const SyncStatusSchema = z.enum([
 ]);
 export type SyncStatus = z.infer<typeof SyncStatusSchema>;
 
+// schemaVersion bumped from 1 to 2 with lastConflictsSeenAt for the
+// PROJ-9 tray-badge "new conflicts since you last looked" query. v1 files
+// load with null and the next conflicts-page open backfills it.
 export const AppStateSchema = z.object({
-  schemaVersion: z.literal(1).default(1),
+  schemaVersion: z.union([z.literal(1), z.literal(2)]).default(2),
   firstLaunchDone: z.boolean().default(false),
   lastSyncAt: z.string().nullable().default(null),
   lastSyncStatus: SyncStatusSchema.default('idle'),
   nextScheduledSyncAt: z.string().nullable().default(null),
+  lastConflictsSeenAt: z.string().nullable().default(null),
   mainWindowBounds: z
     .object({
       x: z.number(),

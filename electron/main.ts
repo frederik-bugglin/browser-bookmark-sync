@@ -17,6 +17,7 @@ import {
 import { SyncService, type SyncState } from './sync';
 import { SyncTrigger, createDnsProbe, createElectronNotifier } from './sync-trigger';
 import { BrowsersService, migrateSettingsV1ToV2 } from './browsers';
+import { ConflictsService } from './conflicts';
 
 const PROTOCOL = 'junction';
 let pendingDeepLink: string | null = null;
@@ -125,6 +126,17 @@ async function boot(): Promise<void> {
     powerEvents: powerMonitor,
   });
 
+  const conflictsService = new ConflictsService({
+    supabaseProvider: () => authService!.getClient(),
+    cloud: createSupabaseCloudClient(authService.getClient()),
+    auth: authService,
+    appStateStore,
+    triggerSync: () => syncTrigger.triggerNow(),
+  });
+
+  // Boot-time prune (best-effort, gated on auth + once-per-day inside service).
+  void conflictsService.pruneIfDue();
+
   const windows = new WindowManager(appStateStore);
 
   registerIpcHandlers({
@@ -135,6 +147,7 @@ async function boot(): Promise<void> {
     permissions: permissionsService,
     sync: syncService,
     browsers: browsersService,
+    conflicts: conflictsService,
     getAllWindows: () => BrowserWindow.getAllWindows(),
   });
 

@@ -23,11 +23,12 @@ const FALLBACK: Settings = {
 };
 const FALLBACK_AUTH: AuthStatus = { state: 'loading' };
 const FALLBACK_APP_STATE: AppState = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   firstLaunchDone: true,
   lastSyncAt: null,
   lastSyncStatus: 'idle',
   nextScheduledSyncAt: null,
+  lastConflictsSeenAt: null,
   mainWindowBounds: null,
 };
 

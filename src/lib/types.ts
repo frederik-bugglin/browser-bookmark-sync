@@ -1,11 +1,12 @@
 export type SyncStatus = 'idle' | 'running' | 'success' | 'error' | 'skipped-offline';
 
 export type AppState = {
-  schemaVersion: 1;
+  schemaVersion: 1 | 2;
   firstLaunchDone: boolean;
   lastSyncAt: string | null;
   lastSyncStatus: SyncStatus;
   nextScheduledSyncAt: string | null;
+  lastConflictsSeenAt: string | null;
   mainWindowBounds: {
     x: number;
     y: number;
@@ -82,3 +83,53 @@ export type SyncEngineState = {
   isRunning: boolean;
   lastResult: { runId: string; outcome: SyncRunOutcome; log: SyncRunSummary } | null;
 };
+
+// Conflict log types — must mirror electron/conflicts/types.ts.
+
+export type ConflictStatus = 'open' | 'restored' | 'dismissed';
+
+export type NormalizedBookmarkLite = {
+  id: string;
+  url: string;
+  urlNormalized: string;
+  title: string;
+  folderPath: string;
+  rootKey: 'toolbar' | 'unfiled' | 'mobile' | 'menu';
+  dateAdded: string | null;
+  dateModified: string | null;
+};
+
+export type ConflictEntry = {
+  id: string;
+  bookmarkHash: string;
+  winnerVersion: NormalizedBookmarkLite;
+  loserVersion: NormalizedBookmarkLite;
+  winnerBrowserId: BrowserId;
+  loserBrowserId: BrowserId;
+  syncRunId: string;
+  status: ConflictStatus;
+  createdAt: string;
+  resolvedAt: string | null;
+  restoreOriginId: string | null;
+};
+
+export type ConflictFilter = {
+  status?: ConflictStatus | 'all';
+  winnerBrowserIds?: BrowserId[];
+  loserBrowserIds?: BrowserId[];
+  createdFrom?: string;
+  createdTo?: string;
+  search?: string;
+  offset?: number;
+  limit?: number;
+};
+
+export type ConflictListResult = {
+  entries: ConflictEntry[];
+  hasMore: boolean;
+  nextOffset: number | null;
+};
+
+export type RestoreResult =
+  | { ok: true }
+  | { ok: false; reason: 'not-open' | 'offline' | 'unauthenticated' | 'unknown'; message: string };

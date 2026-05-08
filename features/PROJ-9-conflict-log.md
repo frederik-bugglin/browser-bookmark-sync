@@ -1,8 +1,8 @@
 # PROJ-9: Konflikt-Log
 
-## Status: Architected
+## Status: In Progress
 **Created:** 2026-05-06
-**Last Updated:** 2026-05-06 (Tech Design via /architecture)
+**Last Updated:** 2026-05-08 (Frontend + Main-Process implementiert)
 
 ## Dependencies
 - PROJ-2 (Supabase Backend) für `conflict_log`-Tabelle und RLS
@@ -306,6 +306,45 @@ ConflictsPage (Server-Component)
 2. **Diff-Performance bei sehr langen Pfaden:** Wenn der User Bookmarks tief verschachtelt hat (z.B. `/lesezeichenleiste/recherche/projekte/2026/q2/notes/draft`), wird der Pfad-Diff visuell überfordernd. Frontend entscheidet, ob Pfad nur als kompletter String diffed wird oder Segment-für-Segment. Empfehlung: Segment-Level mit Klappbar-Mechanik
 3. **Restore-Bestätigung-UI:** Soll Klick auf "Wiederherstellen" sofort handeln oder erst per `AlertDialog` bestätigen? Dauerhaftes UX-Pattern in der App: Restore = nicht destruktiv, Direct-Click ist OK; Dismiss = ebenfalls direct-Click. Wenn der Nutzer doch unsicher: optionale Confirm-Setting in Phase 2
 4. **Tabelle-Performance bei 10'000+ Einträgen:** Range-Pagination liefert nur 50 pro Page, also kein Renderer-Performance-Problem. Das eigentliche Risiko ist die Supabase-Query-Geschwindigkeit ohne passenden Index. Backend muss die genannten Indexe explizit setzen, sonst Full-Table-Scan
+
+## Implementation Notes
+
+**Stand 2026-05-08, Frontend + Main-Process zusammen gebaut:**
+
+### Was neu ist
+- **AppState v2** in `electron/state.ts`: neues Feld `lastConflictsSeenAt` für die "neue Konflikte seit letztem Anschauen"-Query. v1-Files migrieren still (Default null).
+- **electron/conflicts/** Module:
+  - `types.ts` — `ConflictEntry`, `ConflictFilter`, `ConflictStatus`, `RestoreResult`, `ConflictListResult`
+  - `query.ts` — `listConflicts/getConflictById/countConflictsSince/setConflictStatus`, server-side Filter via Supabase, Range-Pagination mit "hasMore"-Detection (limit+1)
+  - `restore.ts` — Schreibt Loser-Version mit frischem `date_modified` per `cloud.upsertBookmarksCloud`, setzt Status auf `restored`, triggert Sync. Idempotent: refused wenn Status nicht mehr `open`.
+  - `prune.ts` — Boot-Pruning nach 90 Tagen, schont `open`-Einträge
+  - `index.ts` — `ConflictsService` als EventEmitter, kapselt alle Public Calls + per-Tag-Throttle für Pruning
+- **IPC-Handler** in `electron/ipc.ts`: `conflicts:list/get-by-id/count-since-last-seen/mark-seen/restore/dismiss`, Push-Event `conflicts:changed`
+- **Preload + Bridge** für Renderer-Zugriff
+- **Mock-Bridge** mit drei realistischen Mock-Konflikten (open/restored/dismissed) für Browser-Dev
+- **Renderer-Komponenten** unter `src/components/conflicts/`:
+  - `filter-bar.tsx` — Suche, Status, Datum von/bis (native Date-Inputs statt shadcn-Calendar)
+  - `conflicts-table.tsx` — Tabelle mit Status-Badges (open default, restored grün outline, dismissed secondary)
+  - `conflict-detail-dialog.tsx` — Side-by-side-Diff mit Restore + Dismiss + Schliessen-Buttons
+  - `diff-renderer.tsx` — Wort-Level-Diff (Titel), Char-Level (URL), Segment-Level (Pfad)
+- **Hook** `src/hooks/use-conflicts.ts` — Filter-Refetch, Subscribe auf `conflicts:changed`, LoadMore
+- **Page** `src/app/conflicts/page.tsx` — komplette Konflikt-Log-Seite mit Filter, Tabelle, Empty-States, Detail-Dialog, Sonner-Toasts
+
+### Bewusste Abweichungen vom Tech-Design
+- **Date-Range-Picker:** Statt shadcn-Calendar + react-day-picker werden native HTML5-Date-Inputs verwendet. Kein zusätzliches Setup, auf macOS nutzt der Browser den System-DatePicker. Falls UX später feiner werden soll, schlanker Upgrade-Pfad.
+- **Engine-Helper `markBookmarkForRestore`:** Nicht extra ausgekoppelt — Restore nutzt direkt die existierende `cloud.upsertBookmarksCloud`-API. Spart einen Indirection-Hop.
+- **Retention-Konfiguration:** Hardcoded auf 90 Tage statt in Settings exponiert. Kann später in Settings v3 nachgerüstet werden.
+- **Tray-Badge-Verkabelung:** Nur die `countSinceLastSeen`-API + `markSeen` gebaut. Tray-Anzeige bleibt PROJ-7-Scope (kleiner Mini-Patch in `tray.ts`).
+
+### Tests
+- 217/217 grün (vorher 214, +3 neue)
+- `electron/conflicts/restore.test.ts`: Restore-Erfolg mit frischem date_modified, Refusal bei nicht-open Status, Conflict-not-found
+
+### Was Implementation explizit nicht enthält
+- Tray-Badge-Anzeige (bleibt PROJ-7)
+- Retention-Setting in Settings-UI (Hardcoded für MVP)
+- Deutsche Locale für Date-Picker (native Browser-Locale aktiv)
+- shadcn `Calendar`-Installation und react-day-picker
 
 ## QA Test Results
 _To be added by /qa_

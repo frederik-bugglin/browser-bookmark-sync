@@ -8,6 +8,8 @@ import type { AuthService, AuthStatus } from './auth';
 import type { PermissionsService, PermissionsState } from './permissions';
 import type { SyncService, SyncState } from './sync';
 import type { BrowsersService, BrowserStatus } from './browsers';
+import type { ConflictsService } from './conflicts';
+import type { ConflictFilter } from './conflicts/types';
 
 type Deps = {
   appStateStore: JsonStore<AppState>;
@@ -17,10 +19,11 @@ type Deps = {
   permissions: PermissionsService;
   sync: SyncService;
   browsers: BrowsersService;
+  conflicts: ConflictsService;
   getAllWindows: () => BrowserWindow[];
 };
 
-export function registerIpcHandlers({ appStateStore, settingsStore, windows, auth, permissions, sync, browsers, getAllWindows }: Deps): void {
+export function registerIpcHandlers({ appStateStore, settingsStore, windows, auth, permissions, sync, browsers, conflicts, getAllWindows }: Deps): void {
   ipcMain.handle('app:state:get', () => appStateStore.get());
 
   ipcMain.handle('app:state:set', (_e, patch: unknown) => {
@@ -111,6 +114,28 @@ export function registerIpcHandlers({ appStateStore, settingsStore, windows, aut
     settingsStore.set({ acknowledgedBrowsers: [...ackSet] });
   });
 
+  ipcMain.handle('conflicts:list', (_e, filter: unknown) => {
+    // Accept any object; the service does its own validation via ConflictFilter shape.
+    const f = (typeof filter === 'object' && filter ? filter : {}) as ConflictFilter;
+    return conflicts.list(f);
+  });
+  ipcMain.handle('conflicts:get-by-id', (_e, id: unknown) => {
+    if (typeof id !== 'string') throw new Error('id must be string');
+    return conflicts.getById(id);
+  });
+  ipcMain.handle('conflicts:count-since-last-seen', () => conflicts.countSinceLastSeen());
+  ipcMain.handle('conflicts:mark-seen', () => {
+    conflicts.markSeen();
+  });
+  ipcMain.handle('conflicts:restore', (_e, id: unknown) => {
+    if (typeof id !== 'string') throw new Error('id must be string');
+    return conflicts.restore(id);
+  });
+  ipcMain.handle('conflicts:dismiss', (_e, id: unknown) => {
+    if (typeof id !== 'string') throw new Error('id must be string');
+    return conflicts.dismiss(id);
+  });
+
   // During shutdown, webContents can be destroyed before the BrowserWindow
   // itself reports isDestroyed() = true. We need to guard both checks AND
   // wrap in try/catch because Electron occasionally races the destruction
@@ -135,4 +160,5 @@ export function registerIpcHandlers({ appStateStore, settingsStore, windows, aut
   permissions.on('change', (state: PermissionsState) => broadcast('permissions:state:changed', state));
   sync.on('change', (state: SyncState) => broadcast('sync:state:changed', state));
   browsers.on('change', (list: BrowserStatus[]) => broadcast('browsers:changed', list));
+  conflicts.on('change', () => broadcast('conflicts:changed', undefined));
 }
