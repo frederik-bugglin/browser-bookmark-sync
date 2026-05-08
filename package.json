@@ -18,7 +18,7 @@
     "electron:compile:watch": "tsc -p electron/tsconfig.json --watch --preserveWatchOutput",
     "electron:dev": "npm run electron:compile && concurrently -k -n NEXT,TSC,ELECTRON -c blue,yellow,green \"next dev\" \"npm run electron:compile:watch\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development electronmon .\"",
     "electron:dev:simple": "npm run electron:compile && cross-env NODE_ENV=development electron .",
-    "electron:build": "next build && npm run electron:compile && electron-builder",
+    "electron:build": "node scripts/inject-build-config.mjs && next build && npm run electron:compile && electron-builder; _exit=$?; git restore electron/build-config.ts; exit $_exit",
     "electron:rebuild": "electron-rebuild",
     "icons:generate": "node scripts/generate-icons.mjs"
   },

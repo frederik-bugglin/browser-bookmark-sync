@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
 import { app } from 'electron';
+import { BUILD_CONFIG } from './build-config';
 
 const ConfigSchema = z.object({
   SUPABASE_URL: z.string().url('SUPABASE_URL must be a valid URL'),
@@ -58,9 +59,12 @@ export function loadConfig(): Config {
   if (cached) return cached;
 
   const fromFile = loadFromDotEnv();
+  // Resolution order: explicit env vars (CI, dev override) > .env.local
+  // (developer machines) > BUILD_CONFIG (baked in at production build time).
   const merged = {
-    SUPABASE_URL: process.env.SUPABASE_URL || fromFile.SUPABASE_URL || '',
-    SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY || fromFile.SUPABASE_ANON_KEY || '',
+    SUPABASE_URL: process.env.SUPABASE_URL || fromFile.SUPABASE_URL || BUILD_CONFIG.SUPABASE_URL,
+    SUPABASE_ANON_KEY:
+      process.env.SUPABASE_ANON_KEY || fromFile.SUPABASE_ANON_KEY || BUILD_CONFIG.SUPABASE_ANON_KEY,
   };
 
   const parsed = ConfigSchema.safeParse(merged);
