@@ -44,6 +44,7 @@ where users can create projects, assign tasks, and track progress.
 ```
 
 The skill will:
+
 1. Ask interactive questions to clarify your vision, target users, and MVP scope
 2. Create your **Product Requirements Document** (`docs/PRD.md`)
 3. Break the project into individual features (Single Responsibility)
@@ -73,15 +74,15 @@ To add more features later, run `/requirements` again - it detects the existing 
 
 ## Available Skills
 
-| Skill | Command | What It Does |
-|-------|---------|-------------|
+| Skill                 | Command         | What It Does                                                             |
+| --------------------- | --------------- | ------------------------------------------------------------------------ |
 | Requirements Engineer | `/requirements` | Creates feature specs with user stories, acceptance criteria, edge cases |
-| Solution Architect | `/architecture` | Designs PM-friendly tech architecture (no code, only high-level design) |
-| Frontend Developer | `/frontend` | Builds UI with React, Tailwind CSS, and shadcn/ui |
-| Backend Developer | `/backend` | Builds APIs, database schemas, RLS policies with Supabase |
-| QA Engineer | `/qa` | Tests features against acceptance criteria + security audit |
-| DevOps | `/deploy` | Deploys to Vercel with production-ready checks |
-| Help | `/help` | Context-aware guide: shows where you are and what to do next |
+| Solution Architect    | `/architecture` | Designs PM-friendly tech architecture (no code, only high-level design)  |
+| Frontend Developer    | `/frontend`     | Builds UI with React, Tailwind CSS, and shadcn/ui                        |
+| Backend Developer     | `/backend`      | Builds APIs, database schemas, RLS policies with Supabase                |
+| QA Engineer           | `/qa`           | Tests features against acceptance criteria + security audit              |
+| DevOps                | `/deploy`       | Deploys to Vercel with production-ready checks                           |
+| Help                  | `/help`         | Context-aware guide: shows where you are and what to do next             |
 
 ### How Skills Work
 
@@ -107,10 +108,10 @@ To add more features later, run `/requirements` again - it detects the existing 
 
 Features are tracked in `features/INDEX.md`:
 
-| ID | Feature | Status | Spec |
-|----|---------|--------|------|
-| PROJ-1 | User Login | Deployed | [Spec](features/PROJ-1-user-login.md) |
-| PROJ-2 | Dashboard | In Progress | [Spec](features/PROJ-2-dashboard.md) |
+| ID     | Feature    | Status      | Spec                                  |
+| ------ | ---------- | ----------- | ------------------------------------- |
+| PROJ-1 | User Login | Deployed    | [Spec](features/PROJ-1-user-login.md) |
+| PROJ-2 | Dashboard  | In Progress | [Spec](features/PROJ-2-dashboard.md)  |
 
 Every skill reads this file at start and updates it when done, preventing duplicate work.
 
@@ -118,15 +119,15 @@ Every skill reads this file at start and updates it when done, preventing duplic
 
 ## Tech Stack
 
-| Category | Tool | Why? |
-|----------|------|------|
-| **Framework** | Next.js 16 | React + Server Components + App Router |
-| **Language** | TypeScript | Type safety |
-| **Styling** | Tailwind CSS | Utility-first CSS |
-| **UI Library** | shadcn/ui | Copy-paste, customizable components |
-| **Backend** | Supabase (optional) | PostgreSQL + Auth + Storage + Realtime |
-| **Deployment** | Vercel | Zero-config Next.js hosting |
-| **Validation** | Zod | Runtime type validation |
+| Category       | Tool         | Why?                                   |
+| -------------- | ------------ | -------------------------------------- |
+| **Framework**  | Next.js 16   | React + Server Components + App Router |
+| **Language**   | TypeScript   | Type safety                            |
+| **Styling**    | Tailwind CSS | Utility-first CSS                      |
+| **UI Library** | shadcn/ui    | Copy-paste, customizable components    |
+| **Backend**    | Supabase     | PostgreSQL + Auth + Storage + Realtime |
+| **Deployment** | Vercel       | Zero-config Next.js hosting            |
+| **Validation** | Zod          | Runtime type validation                |
 
 ---
 
@@ -182,6 +183,7 @@ ai-coding-starter-kit/
 ### 1. Fill Out Your PRD
 
 Define your product vision in `docs/PRD.md`:
+
 - What are you building and why?
 - Who are the target users?
 - What features are on the roadmap?
@@ -189,6 +191,7 @@ Define your product vision in `docs/PRD.md`:
 ### 2. Build Your First Feature
 
 Run `/requirements` with your feature idea. The skill will:
+
 - Ask interactive questions to clarify requirements
 - Create a feature spec in `features/PROJ-1-name.md`
 - Update `features/INDEX.md` with the new feature
@@ -197,6 +200,7 @@ Run `/requirements` with your feature idea. The skill will:
 ### 3. Add shadcn/ui Components (as needed)
 
 35+ components are pre-installed. Add more as needed:
+
 ```bash
 npx shadcn@latest add [component-name]
 ```
@@ -204,6 +208,7 @@ npx shadcn@latest add [component-name]
 ### 4. Production Setup (first deployment)
 
 When you're ready to deploy, the `/deploy` skill guides you through:
+
 - Vercel setup and deployment
 - Error tracking with Sentry
 - Security headers configuration
@@ -216,25 +221,29 @@ See `docs/production/` for detailed setup guides.
 ## How It Works Under the Hood
 
 ### Skills (`.claude/skills/`)
+
 Each skill is a structured workflow that Claude Code discovers automatically. Skills can run inline (in the main conversation) or as forked sub-agents (isolated context window).
 
-| Skill | Execution | Why? |
-|-------|-----------|------|
-| `/requirements` | Inline | Needs live interaction with user |
-| `/architecture` | Inline | Short output, user reviews in real-time |
-| `/frontend` | Sub-agent (forked) | Heavy file editing, lots of output |
-| `/backend` | Sub-agent (forked) | Heavy file editing, SQL, API code |
-| `/qa` | Sub-agent (forked) | Systematic testing, lots of output |
-| `/deploy` | Inline | Deployment needs user oversight |
-| `/help` | Inline | Quick status check and guidance |
+| Skill           | Execution          | Why?                                    |
+| --------------- | ------------------ | --------------------------------------- |
+| `/requirements` | Inline             | Needs live interaction with user        |
+| `/architecture` | Inline             | Short output, user reviews in real-time |
+| `/frontend`     | Sub-agent (forked) | Heavy file editing, lots of output      |
+| `/backend`      | Sub-agent (forked) | Heavy file editing, SQL, API code       |
+| `/qa`           | Sub-agent (forked) | Systematic testing, lots of output      |
+| `/deploy`       | Inline             | Deployment needs user oversight         |
+| `/help`         | Inline             | Quick status check and guidance         |
 
 ### Rules (`.claude/rules/`)
+
 Coding standards that are auto-applied based on which files Claude is working with. No manual loading needed.
 
 ### Sub-Agent Configs (`.claude/agents/`)
+
 Lightweight configurations that define model, tool access, and turn limits for forked skills.
 
 ### CLAUDE.md
+
 Auto-loaded at every session start. Contains tech stack, conventions, and references to PRD and feature index.
 
 ---
@@ -251,13 +260,13 @@ Every skill reads `features/INDEX.md` and the relevant feature spec at start. Af
 
 Not everything is loaded at once. Information is layered by relevance:
 
-| Layer | What | When loaded |
-|-------|------|-------------|
-| `CLAUDE.md` | Tech stack, conventions, commands | Every session (auto) |
-| `.claude/rules/` | Coding standards | When editing matching files (auto) |
-| Skill `SKILL.md` | Workflow instructions | When skill is invoked |
-| Feature spec | Requirements, AC, tech design | On demand (skill reads it) |
-| `docs/production/` | Deployment guides | Only when referenced |
+| Layer              | What                              | When loaded                        |
+| ------------------ | --------------------------------- | ---------------------------------- |
+| `CLAUDE.md`        | Tech stack, conventions, commands | Every session (auto)               |
+| `.claude/rules/`   | Coding standards                  | When editing matching files (auto) |
+| Skill `SKILL.md`   | Workflow instructions             | When skill is invoked              |
+| Feature spec       | Requirements, AC, tech design     | On demand (skill reads it)         |
+| `docs/production/` | Deployment guides                 | Only when referenced               |
 
 ### Context is isolated
 
@@ -289,13 +298,13 @@ This template is designed as a starting point. Customize it for your team:
 
 Standalone guides in `docs/production/`:
 
-| Guide | Setup Time | What It Does |
-|-------|-----------|-------------|
-| [Error Tracking](docs/production/error-tracking.md) | 5 min | Sentry integration for automatic error capture |
-| [Security Headers](docs/production/security-headers.md) | 2 min | XSS, Clickjacking, MIME sniffing protection |
-| [Performance](docs/production/performance.md) | 10 min | Lighthouse checks, image optimization, caching |
-| [Database Optimization](docs/production/database-optimization.md) | 15 min | Indexing, N+1 prevention, query optimization |
-| [Rate Limiting](docs/production/rate-limiting.md) | 10 min | Upstash Redis for API abuse prevention |
+| Guide                                                             | Setup Time | What It Does                                   |
+| ----------------------------------------------------------------- | ---------- | ---------------------------------------------- |
+| [Error Tracking](docs/production/error-tracking.md)               | 5 min      | Sentry integration for automatic error capture |
+| [Security Headers](docs/production/security-headers.md)           | 2 min      | XSS, Clickjacking, MIME sniffing protection    |
+| [Performance](docs/production/performance.md)                     | 10 min     | Lighthouse checks, image optimization, caching |
+| [Database Optimization](docs/production/database-optimization.md) | 15 min     | Indexing, N+1 prevention, query optimization   |
+| [Rate Limiting](docs/production/rate-limiting.md)                 | 10 min     | Upstash Redis for API abuse prevention         |
 
 ---
 
