@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog } from 'electron';
+import { app, BrowserWindow, dialog, powerMonitor } from 'electron';
 import { JsonStore } from './store';
 import { AppStateSchema, SettingsSchema, defaultAppState, defaultSettings, type AppState, type Settings } from './state';
 import { WindowManager } from './windows';
@@ -14,7 +14,8 @@ import {
   createRealDrivers,
   createSupabaseCloudClient,
 } from './sync-engine';
-import { SyncService } from './sync';
+import { SyncService, type SyncState } from './sync';
+import { SyncTrigger, createDnsProbe, createElectronNotifier } from './sync-trigger';
 
 const PROTOCOL = 'junction';
 let pendingDeepLink: string | null = null;
@@ -91,6 +92,33 @@ async function boot(): Promise<void> {
   });
   const syncService = new SyncService(syncEngine, authService);
 
+  // Mirror sync state to AppState so Renderer subscribers (popover, header,
+  // tray) see run progress regardless of who triggered the sync (tray click,
+  // renderer IPC, or auto-trigger). 'skipped-offline' is owned by SyncTrigger
+  // and is not overwritten here.
+  syncService.on('change', (state: SyncState) => {
+    if (state.isRunning) {
+      appStateStore.set({ lastSyncStatus: 'running' });
+      return;
+    }
+    if (!state.lastResult) return;
+    const isError = state.lastResult.outcome === 'error';
+    appStateStore.set({
+      lastSyncStatus: isError ? 'error' : 'success',
+      lastSyncAt: new Date().toISOString(),
+    });
+  });
+
+  const syncTrigger = new SyncTrigger({
+    syncService,
+    appStateStore,
+    settingsStore,
+    authService,
+    isOnline: createDnsProbe(configResult.config.SUPABASE_URL),
+    notify: createElectronNotifier(),
+    powerEvents: powerMonitor,
+  });
+
   const windows = new WindowManager(appStateStore);
 
   registerIpcHandlers({
@@ -104,25 +132,10 @@ async function boot(): Promise<void> {
   });
 
   const tray = createTray(windows, appStateStore, () => {
-    // Manual sync trigger from the tray. Full scheduler comes with PROJ-7.
-    // We update lastSyncStatus before/after so the tray icon and Renderer
-    // subscribers see the run progress.
-    void (async () => {
-      try {
-        appStateStore.set({ lastSyncStatus: 'running' });
-        const result = await syncService.run('manual');
-        appStateStore.set({
-          lastSyncStatus: result.outcome === 'success' ? 'success' : 'error',
-          lastSyncAt: new Date().toISOString(),
-        });
-      } catch (err) {
-        appStateStore.set({ lastSyncStatus: 'error' });
-        // Keep the rejection visible in dev for now; PROJ-7 will surface
-        // failures via a Renderer-side toast.
-        console.error('[junction] manual sync failed:', err);
-      }
-    })();
+    void syncTrigger.triggerNow();
   });
+
+  syncTrigger.start();
 
   if (authService.getStatus().state !== 'authenticated') {
     await windows.showOnboarding();
@@ -144,6 +157,7 @@ async function boot(): Promise<void> {
 
   app.on('before-quit', () => {
     windows.setQuitting(true);
+    syncTrigger.stop();
     tray.destroy();
   });
 }

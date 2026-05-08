@@ -17,7 +17,8 @@ export function createTray(
   const image = loadTrayImage();
   const tray = new Tray(image);
   tray.setToolTip('Junction');
-  if (image.isEmpty()) tray.setTitle('Junction');
+  // Title is set via refreshMenu() below — handles both the image-empty
+  // fallback and the running-sync indicator in one place.
 
   const refreshMenu = () => {
     // Window-bounds saves during shutdown can fire AppState change events
@@ -27,6 +28,16 @@ export function createTray(
     const status = appStateStore.get().lastSyncStatus;
     const lastAt = appStateStore.get().lastSyncAt;
     const statusLabel = formatStatusLabel(status, lastAt);
+
+    // Subtle activity hint next to the menubar icon during sync. When the
+    // icon image failed to load, we keep the 'Junction' fallback title so
+    // there's still something visible.
+    const isRunning = status === 'running';
+    if (image.isEmpty()) {
+      tray.setTitle(isRunning ? 'Junction · syncing' : 'Junction');
+    } else {
+      tray.setTitle(isRunning ? '· syncing' : '');
+    }
 
     const contextMenu = Menu.buildFromTemplate([
       { label: statusLabel, enabled: false },
@@ -73,6 +84,7 @@ function loadTrayImage(): Electron.NativeImage {
 function formatStatusLabel(status: string, lastAt: string | null): string {
   if (status === 'running') return 'Synchronisiert…';
   if (status === 'error') return 'Letzter Sync: Fehler';
+  if (status === 'skipped-offline') return 'Offline, Sync pausiert';
   if (lastAt) {
     const date = new Date(lastAt);
     const formatted = date.toLocaleString('de-CH', {
