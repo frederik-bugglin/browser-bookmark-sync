@@ -7,45 +7,71 @@ import { BrandMark } from '@/components/brand-mark';
 import { SyncStatusPill } from '@/components/sync-status-pill';
 import { BrowserListCompact } from '@/components/browser-list-compact';
 import { junction } from '@/lib/electron-bridge';
-import type { AppState } from '@/lib/types';
+import { useNextSyncLabel } from '@/hooks/use-next-sync-label';
+import type { AppState, Settings } from '@/lib/types';
 
 const FALLBACK_STATE: AppState = {
   schemaVersion: 1,
   firstLaunchDone: true,
   lastSyncAt: null,
   lastSyncStatus: 'idle',
+  nextScheduledSyncAt: null,
   mainWindowBounds: null,
+};
+
+const FALLBACK_SETTINGS: Settings = {
+  schemaVersion: 1,
+  autoLaunch: true,
+  autoSyncEnabled: true,
+  autoSyncIntervalMin: 15,
+  notifyOnSyncError: false,
 };
 
 export function PopoverShell() {
   const [state, setState] = useState<AppState>(FALLBACK_STATE);
+  const [settings, setSettings] = useState<Settings>(FALLBACK_SETTINGS);
 
   useEffect(() => {
     let cancelled = false;
     void junction().appState.get().then((s) => {
       if (!cancelled) setState(s);
     });
-    const unsubscribe = junction().appState.subscribe(setState);
+    void junction().settings.get().then((s) => {
+      if (!cancelled) setSettings(s);
+    });
+    const unsubState = junction().appState.subscribe(setState);
+    const unsubSettings = junction().settings.subscribe(setSettings);
     return () => {
       cancelled = true;
-      unsubscribe();
+      unsubState();
+      unsubSettings();
     };
   }, []);
 
-  const handleSync = () => {
-    void junction().appState.set({ lastSyncStatus: 'running' });
-    setTimeout(() => {
-      void junction().appState.set({
-        lastSyncStatus: 'success',
-        lastSyncAt: new Date().toISOString(),
-      });
-    }, 1200);
+  const handleSync = async () => {
+    try {
+      await junction().sync.run('manual');
+    } catch {
+      // Error wird über AppState.lastSyncStatus = 'error' im Pill sichtbar.
+      // Kein Toast hier, der Popover ist platzbeschränkt.
+    }
   };
 
   const handleOpenMain = () => {
     void junction().window.showMain();
     void junction().window.hidePopover();
   };
+
+  const nextLabel = useNextSyncLabel(
+    settings.autoSyncEnabled ? state.nextScheduledSyncAt : null,
+  );
+  const footerHint = !settings.autoSyncEnabled
+    ? 'Auto-Sync aus'
+    : state.lastSyncStatus === 'skipped-offline'
+      ? 'Sync pausiert · offline'
+      : nextLabel
+        ? `Nächster Sync ${nextLabel}`
+        : null;
 
   return (
     <div className="flex h-screen w-screen flex-col bg-background text-foreground">
@@ -72,6 +98,9 @@ export function PopoverShell() {
           <ExternalLink className="h-3.5 w-3.5" />
           Hauptfenster öffnen
         </Button>
+        {footerHint && (
+          <p className="pt-1 text-center text-[11px] text-muted-foreground">{footerHint}</p>
+        )}
       </div>
     </div>
   );

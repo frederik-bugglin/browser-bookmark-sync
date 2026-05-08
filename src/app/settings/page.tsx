@@ -7,14 +7,30 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { SettingsSyncSection } from '@/components/settings-sync-section';
 import { junction } from '@/lib/electron-bridge';
-import type { AuthStatus, Settings } from '@/lib/types';
+import type { AppState, AuthStatus, Settings } from '@/lib/types';
 
-const FALLBACK: Settings = { schemaVersion: 1, autoLaunch: true };
+const FALLBACK: Settings = {
+  schemaVersion: 1,
+  autoLaunch: true,
+  autoSyncEnabled: true,
+  autoSyncIntervalMin: 15,
+  notifyOnSyncError: false,
+};
 const FALLBACK_AUTH: AuthStatus = { state: 'loading' };
+const FALLBACK_APP_STATE: AppState = {
+  schemaVersion: 1,
+  firstLaunchDone: true,
+  lastSyncAt: null,
+  lastSyncStatus: 'idle',
+  nextScheduledSyncAt: null,
+  mainWindowBounds: null,
+};
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<Settings>(FALLBACK);
+  const [appState, setAppState] = useState<AppState>(FALLBACK_APP_STATE);
   const [auth, setAuth] = useState<AuthStatus>(FALLBACK_AUTH);
   const [signingOut, setSigningOut] = useState(false);
 
@@ -23,14 +39,19 @@ export default function SettingsPage() {
     void junction().settings.get().then((s) => {
       if (!cancelled) setSettings(s);
     });
+    void junction().appState.get().then((s) => {
+      if (!cancelled) setAppState(s);
+    });
     void junction().auth.getStatus().then((s) => {
       if (!cancelled) setAuth(s);
     });
     const unsubSettings = junction().settings.subscribe(setSettings);
+    const unsubAppState = junction().appState.subscribe(setAppState);
     const unsubAuth = junction().auth.subscribe(setAuth);
     return () => {
       cancelled = true;
       unsubSettings();
+      unsubAppState();
       unsubAuth();
     };
   }, []);
@@ -38,6 +59,11 @@ export default function SettingsPage() {
   const handleAutoLaunchChange = (value: boolean) => {
     setSettings((s) => ({ ...s, autoLaunch: value }));
     void junction().settings.set({ autoLaunch: value });
+  };
+
+  const handleSyncSettingsChange = (patch: Partial<Settings>) => {
+    setSettings((s) => ({ ...s, ...patch }));
+    void junction().settings.set(patch);
   };
 
   const handleSignOut = async () => {
@@ -53,7 +79,7 @@ export default function SettingsPage() {
         <header>
           <h1 className="text-2xl font-semibold tracking-tight">Einstellungen</h1>
           <p className="text-sm text-muted-foreground">
-            Account und allgemeines App-Verhalten. Browser-Auswahl und Sync-Intervall folgen in PROJ-8.
+            Account, App-Verhalten und Synchronisation. Browser-Auswahl folgt in PROJ-8.
           </p>
         </header>
 
@@ -105,6 +131,12 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
+        <SettingsSyncSection
+          settings={settings}
+          appState={appState}
+          onChange={handleSyncSettingsChange}
+        />
+
         <Card className="border-dashed">
           <CardHeader>
             <CardTitle className="text-base">Folgt in späteren Schritten</CardTitle>
@@ -112,8 +144,7 @@ export default function SettingsPage() {
           <CardContent className="text-sm text-muted-foreground">
             <ul className="flex flex-col gap-1.5">
               <li>– Browser-Auswahl pro Sync (PROJ-8)</li>
-              <li>– Auto-Sync-Intervall (PROJ-7 / PROJ-8)</li>
-              <li>– Notification bei Fehlern (PROJ-7)</li>
+              <li>– Konflikt-Log mit Wiederherstellung (PROJ-9)</li>
             </ul>
           </CardContent>
         </Card>

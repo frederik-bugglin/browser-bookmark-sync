@@ -11,6 +11,7 @@ const FALLBACK_STATE: AppState = {
   firstLaunchDone: true,
   lastSyncAt: null,
   lastSyncStatus: 'idle',
+  nextScheduledSyncAt: null,
   mainWindowBounds: null,
 };
 
@@ -29,14 +30,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const handleSyncNow = () => {
-    void junction().appState.set({ lastSyncStatus: 'running' });
-    setTimeout(() => {
-      void junction().appState.set({
-        lastSyncStatus: 'success',
-        lastSyncAt: new Date().toISOString(),
-      });
-    }, 1200);
+  const handleSyncNow = async () => {
+    try {
+      await junction().sync.run('manual');
+    } catch {
+      // Error wird über AppState.lastSyncStatus = 'error' im Pill sichtbar.
+    }
   };
 
   return (

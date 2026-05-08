@@ -62,12 +62,16 @@ const FALLBACK_APP_STATE: AppState = {
   firstLaunchDone: false,
   lastSyncAt: null,
   lastSyncStatus: 'idle',
+  nextScheduledSyncAt: null,
   mainWindowBounds: null,
 };
 
 const FALLBACK_SETTINGS: Settings = {
   schemaVersion: 1,
   autoLaunch: true,
+  autoSyncEnabled: true,
+  autoSyncIntervalMin: 15,
+  notifyOnSyncError: false,
 };
 
 const FALLBACK_PERMISSIONS: PermissionsState = {
@@ -79,12 +83,52 @@ const FALLBACK_SYNC_STATE: SyncEngineState = {
   lastResult: null,
 };
 
+// Mock-Bridge persists user-toggleable state in sessionStorage so navigations
+// between /settings and /popover keep the toggle state during browser-dev.
+// In Electron, this code path is never used (window.junction is the real bridge).
+const MOCK_KEY = 'junction:mock';
+
+type MockPersisted = {
+  appState: AppState;
+  settings: Settings;
+};
+
+function loadMockPersisted(): MockPersisted {
+  if (typeof window === 'undefined') {
+    return { appState: { ...FALLBACK_APP_STATE }, settings: { ...FALLBACK_SETTINGS } };
+  }
+  try {
+    const raw = window.sessionStorage.getItem(MOCK_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<MockPersisted>;
+      return {
+        appState: { ...FALLBACK_APP_STATE, ...parsed.appState },
+        settings: { ...FALLBACK_SETTINGS, ...parsed.settings },
+      };
+    }
+  } catch {
+    // ignore corrupt sessionStorage entries
+  }
+  return { appState: { ...FALLBACK_APP_STATE }, settings: { ...FALLBACK_SETTINGS } };
+}
+
+function saveMockPersisted(data: MockPersisted): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.setItem(MOCK_KEY, JSON.stringify(data));
+  } catch {
+    // ignore quota errors etc.
+  }
+}
+
 function createMockBridge(): Bridge {
-  let appState = { ...FALLBACK_APP_STATE };
-  let settings = { ...FALLBACK_SETTINGS };
+  const persisted = loadMockPersisted();
+  let appState = persisted.appState;
+  let settings = persisted.settings;
   let authStatus: AuthStatus = { state: 'unauthenticated' };
   let permissions: PermissionsState = { ...FALLBACK_PERMISSIONS };
   let syncState: SyncEngineState = { ...FALLBACK_SYNC_STATE };
+  const persist = () => saveMockPersisted({ appState, settings });
   const appStateListeners = new Set<(s: AppState) => void>();
   const settingsListeners = new Set<(s: Settings) => void>();
   const authListeners = new Set<(s: AuthStatus) => void>();
@@ -99,6 +143,7 @@ function createMockBridge(): Bridge {
       get: async () => appState,
       set: async (patch) => {
         appState = { ...appState, ...patch };
+        persist();
         appStateListeners.forEach((l) => l(appState));
         return appState;
       },
@@ -111,6 +156,7 @@ function createMockBridge(): Bridge {
       get: async () => settings,
       set: async (patch) => {
         settings = { ...settings, ...patch };
+        persist();
         settingsListeners.forEach((l) => l(settings));
         return settings;
       },
@@ -172,13 +218,23 @@ function createMockBridge(): Bridge {
     },
     sync: {
       getState: async () => syncState,
-      run: async (triggeredBy) => {
-        // Mock-Run: tut nichts, gibt aber einen plausiblen Erfolgs-Result zurück.
+      run: async (_triggeredBy) => {
+        // Mock-Run: emittiert running-State, simuliert kurze Dauer, gibt
+        // plausibles Erfolgs-Result zurück. Spiegelt zusätzlich AppState
+        // (lastSyncStatus / lastSyncAt), damit die UI-Pille korrekt schaltet.
         const runId = `mock-${Date.now()}`;
+        syncState = { isRunning: true, lastResult: syncState.lastResult };
+        syncListeners.forEach((l) => l(syncState));
+        appState = { ...appState, lastSyncStatus: 'running' };
+        persist();
+        appStateListeners.forEach((l) => l(appState));
+
+        await new Promise((r) => setTimeout(r, 600));
+
         const log: SyncRunSummary = {
           runId,
           outcome: 'success',
-          durationMs: 350,
+          durationMs: 600,
           conflictsWritten: 0,
           cloudBookmarksUpserted: 0,
           cloudBookmarksDeleted: 0,
@@ -186,6 +242,13 @@ function createMockBridge(): Bridge {
         };
         syncState = { isRunning: false, lastResult: { runId, outcome: 'success', log } };
         syncListeners.forEach((l) => l(syncState));
+        appState = {
+          ...appState,
+          lastSyncStatus: 'success',
+          lastSyncAt: new Date().toISOString(),
+        };
+        persist();
+        appStateListeners.forEach((l) => l(appState));
         return { runId, outcome: 'success', log };
       },
       subscribe: (l) => {

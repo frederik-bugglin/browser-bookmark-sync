@@ -1,10 +1,11 @@
-export type SyncStatus = 'idle' | 'running' | 'success' | 'error';
+export type SyncStatus = 'idle' | 'running' | 'success' | 'error' | 'skipped-offline';
 
 export type AppState = {
   schemaVersion: 1;
   firstLaunchDone: boolean;
   lastSyncAt: string | null;
   lastSyncStatus: SyncStatus;
+  nextScheduledSyncAt: string | null;
   mainWindowBounds: {
     x: number;
     y: number;
@@ -13,9 +14,14 @@ export type AppState = {
   } | null;
 };
 
+export type AutoSyncIntervalMin = 5 | 15 | 30 | 60;
+
 export type Settings = {
   schemaVersion: 1;
   autoLaunch: boolean;
+  autoSyncEnabled: boolean;
+  autoSyncIntervalMin: AutoSyncIntervalMin;
+  notifyOnSyncError: boolean;
 };
 
 export type BrowserId =

@@ -15,6 +15,10 @@ const COPY: Record<SyncStatus, { label: string; tone: string }> = {
   running: { label: 'Synchronisiert…', tone: 'bg-primary/10 text-primary' },
   success: { label: 'Aktuell', tone: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' },
   error: { label: 'Fehler', tone: 'bg-destructive/10 text-destructive' },
+  'skipped-offline': {
+    label: 'Offline',
+    tone: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
+  },
 };
 
 export function SyncStatusPill({ status, lastSyncAt, className }: Props) {
