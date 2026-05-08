@@ -47,13 +47,27 @@ const BATCH_SIZE = 500;
 export function createSupabaseCloudClient(supabase: SupabaseClient): CloudClient {
   return {
     async fetchBookmarksCloud(userId) {
-      const { data, error } = await supabase
-        .from('bookmarks_cloud')
-        .select('*')
-        .eq('user_id', userId)
-        .limit(50000);
-      if (error) throw new SyncEngineError(`fetchBookmarksCloud failed: ${error.message}`, error);
-      return (data ?? []) as CloudBookmark[];
+      // Supabase's REST API caps responses at ~1000 rows regardless of any
+      // client-side .limit(). With a multi-thousand-bookmark library that
+      // truncation silently shrinks mergedByHash and the projected snapshot
+      // for every target browser. Page through with .range() until the
+      // server returns fewer than PAGE rows.
+      const PAGE = 1000;
+      const all: CloudBookmark[] = [];
+      let from = 0;
+      while (true) {
+        const { data, error } = await supabase
+          .from('bookmarks_cloud')
+          .select('*')
+          .eq('user_id', userId)
+          .range(from, from + PAGE - 1);
+        if (error) throw new SyncEngineError(`fetchBookmarksCloud failed: ${error.message}`, error);
+        const rows = (data ?? []) as CloudBookmark[];
+        all.push(...rows);
+        if (rows.length < PAGE) break;
+        from += PAGE;
+      }
+      return all;
     },
 
     async upsertBookmarksCloud(userId, rows) {
