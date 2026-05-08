@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { ConflictFilter, ConflictStatus } from '@/lib/types';
+import { BrowserFilter } from './browser-filter';
 
 const STATUS_OPTIONS: { value: ConflictStatus | 'all'; label: string }[] = [
   { value: 'open', label: 'Offen' },
@@ -110,6 +111,22 @@ export function FilterBar({
               })
             }
             className="h-9 w-40"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-muted-foreground">Winner</span>
+          <BrowserFilter
+            label="Winner-Browser"
+            value={filter.winnerBrowserIds}
+            onChange={(next) => onChange({ winnerBrowserIds: next })}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-muted-foreground">Loser</span>
+          <BrowserFilter
+            label="Loser-Browser"
+            value={filter.loserBrowserIds}
+            onChange={(next) => onChange({ loserBrowserIds: next })}
           />
         </div>
         {hasActiveFilter ? (

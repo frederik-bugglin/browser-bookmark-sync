@@ -51,9 +51,11 @@ export function useConflicts(filter: ConflictFilter): {
     }
   }, []);
 
-  // Reset and refetch whenever the filter signature changes.
+  // Reset and refetch whenever the filter signature changes. Each filter
+  // dimension is listed individually so the effect only fires on real value
+  // changes — including the multi-select arrays joined into a stable string.
   useEffect(() => {
-    void fetchPage({ ...filter, offset: 0 }, false);
+    void fetchPage({ ...filterRef.current, offset: 0 }, false);
   }, [
     fetchPage,
     filter.status,
@@ -62,7 +64,6 @@ export function useConflicts(filter: ConflictFilter): {
     filter.createdTo,
     filter.winnerBrowserIds?.join(','),
     filter.loserBrowserIds?.join(','),
-    filter,
   ]);
 
   // Re-fetch when main-process emits change (after restore/dismiss).
