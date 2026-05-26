@@ -1,6 +1,6 @@
 'use client';
 
-import { Sparkles } from 'lucide-react';
+import { Info, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -17,6 +17,10 @@ export function SettingsBrowsersCard() {
   const newBrowsers = browsers.filter((b) => b.installed && b.detected && !b.acknowledged);
   const mainListBrowsers = browsers.filter((b) => b.acknowledged);
   const activeCount = browsers.filter((b) => b.enabled && b.installed && b.detected).length;
+  // Show the iCloud caveat for any Safari setup the user has acknowledged —
+  // even when the toggle is off or FDA is missing, because that is exactly
+  // when "I added a bookmark but nothing synced" confusion shows up.
+  const safariAcknowledged = browsers.some((b) => b.id === 'safari' && b.acknowledged);
 
   return (
     <Card>
@@ -54,6 +58,20 @@ export function SettingsBrowsersCard() {
           <p className="rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
             Aktuell ist kein Browser am Sync beteiligt. Junction läuft trotzdem gegen die Cloud, ändert aber lokal nichts.
           </p>
+        ) : null}
+
+        {safariAcknowledged ? (
+          <div className="flex items-start gap-2 rounded-md border border-amber-500/20 bg-amber-500/5 px-3 py-2.5 text-xs text-amber-700 dark:text-amber-400">
+            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <p>
+              <span className="font-medium">Hinweis zu Safari mit iCloud-Sync:</span>{' '}
+              Neu hinzugefügte Bookmarks schreibt Safari nicht sofort auf die Festplatte —
+              sie leben zuerst nur in iCloud + RAM. Junction sieht sie erst nach kurzer
+              Verzögerung. Falls ein neuer Bookmark direkt nach dem Anlegen nicht
+              synchronisiert wird: ein paar Minuten warten oder den Bookmark in Safari
+              einmal verschieben/bearbeiten, dann erneut synchronisieren.
+            </p>
+          </div>
         ) : null}
       </CardContent>
     </Card>

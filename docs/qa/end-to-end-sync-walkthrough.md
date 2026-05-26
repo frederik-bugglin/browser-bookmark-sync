@@ -82,13 +82,26 @@ copy-then-read when the browser is open vs. closed).
 
 Closes the loop on the Apple-side adapter.
 
+> **Safari + iCloud caveat:** When iCloud Safari Sync is on, freshly-added
+> bookmarks live only in iCloud + RAM at first — Safari does not flush them
+> to `~/Library/Safari/Bookmarks.plist` immediately, so Junction's read
+> sees the *previous* state. Workarounds during the test:
+> - Wait a couple of minutes between adding the bookmark in Safari and
+>   triggering the sync, OR
+> - After adding, move the bookmark to a different folder and back (this
+>   forces Safari to rewrite the plist).
+>
+> Not a Junction bug — Apple owns the persistence cadence. The settings
+> screen also shows this hint to users who enable Safari.
+
 **Steps**
 1. [ ] Quit all browsers
 2. [ ] Open Safari
 3. [ ] Add bookmark: title `Junction-Test-Safari`, URL `https://example.com/junction-safari-1`, in **Favorites**
-4. [ ] Quit Safari
-5. [ ] Sync via tray
-6. [ ] Verify in Chrome and Firefox
+4. [ ] Either wait ~2 min OR move the bookmark to "Bookmarks" and back to "Favorites" to force a plist write
+5. [ ] Quit Safari
+6. [ ] Sync via tray
+7. [ ] Verify in Chrome and Firefox
 
 ---
 
