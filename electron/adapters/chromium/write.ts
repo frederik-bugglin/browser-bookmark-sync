@@ -17,6 +17,21 @@ import {
 
 const MAX_BACKUPS = 3;
 
+// Inverse of chromiumTimeToIso in read.ts. Chromium stores date_added /
+// date_modified as a decimal string of microseconds since 1601-01-01 UTC.
+// Writing an ISO string here would silently strip the timestamp on the
+// next Chromium load — so we always convert at the adapter boundary.
+const CHROMIUM_EPOCH_OFFSET_MICROS = 11644473600000000n;
+
+function isoToChromiumTime(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms) || ms <= 0) return null;
+  const unixMicros = BigInt(ms) * 1000n;
+  const chromiumMicros = unixMicros + CHROMIUM_EPOCH_OFFSET_MICROS;
+  return chromiumMicros.toString();
+}
+
 function backupDir(browserId: string, userDataDir?: string): string {
   const root = userDataDir ?? (app?.getPath ? app.getPath('userData') : '/tmp/junction-userdata-fallback');
   const dir = path.join(root, 'backups', 'chromium', browserId);
@@ -67,8 +82,10 @@ function buildChildren(
       type: 'folder',
       children: buildChildren(rootKey, f.pathNormalized, folders, bookmarks),
     };
-    if (f.dateAdded) folderNode.date_added = f.dateAdded;
-    if (f.dateModified) folderNode.date_modified = f.dateModified;
+    const folderAdded = isoToChromiumTime(f.dateAdded);
+    if (folderAdded) folderNode.date_added = folderAdded;
+    const folderModified = isoToChromiumTime(f.dateModified);
+    if (folderModified) folderNode.date_modified = folderModified;
     children.push(folderNode);
   }
 
@@ -77,13 +94,15 @@ function buildChildren(
     .sort((a, b) => a.title.localeCompare(b.title, 'de'));
 
   for (const b of localBookmarks) {
+    const added = isoToChromiumTime(b.dateAdded);
+    const modified = isoToChromiumTime(b.dateModified);
     children.push({
       id: b.id,
       name: b.title,
       type: 'url',
       url: b.url,
-      ...(b.dateAdded ? { date_added: b.dateAdded } : {}),
-      ...(b.dateModified ? { date_modified: b.dateModified } : {}),
+      ...(added ? { date_added: added } : {}),
+      ...(modified ? { date_modified: modified } : {}),
     });
   }
 

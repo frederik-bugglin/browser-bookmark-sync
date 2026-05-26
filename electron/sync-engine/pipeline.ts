@@ -109,9 +109,9 @@ export async function runPipeline(deps: PipelineDeps): Promise<SyncRunResult> {
     const previous = await deps.cloud.fetchSnapshot(deps.userId, browserPlan.browserId);
     const current = currentSnapshots.get(browserPlan.browserId)!;
     const changes = previous
-      ? diffBrowserSnapshot(previous, current)
+      ? diffBrowserSnapshot(previous, current, startedAt.toISOString())
       : // First sync for this browser: treat all current bookmarks as adds.
-        diffBrowserSnapshot(null, current);
+        diffBrowserSnapshot(null, current, startedAt.toISOString());
     changesByBrowser.set(browserPlan.browserId, changes);
   }
 

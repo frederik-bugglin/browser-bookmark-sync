@@ -49,6 +49,31 @@ describe('writeBookmarks', () => {
     );
   });
 
+  it('round-trip preserves dateAdded / dateModified (regression: was lost as ISO)', () => {
+    const snapshot = readBookmarks(bookmarksPath, 'chrome');
+    // Patch one bookmark with a dateModified so we exercise both fields.
+    const withModified = {
+      ...snapshot,
+      bookmarks: snapshot.bookmarks.map((b, i) =>
+        i === 0 ? { ...b, dateModified: '2026-05-15T08:30:00.000Z' } : b,
+      ),
+    };
+    writeBookmarks({
+      bookmarksPath,
+      browserId: 'chrome',
+      profileDir,
+      snapshot: withModified,
+      userDataDir,
+    });
+    const reloaded = readBookmarks(bookmarksPath, 'chrome');
+
+    const original = withModified.bookmarks[0];
+    const sameUrl = reloaded.bookmarks.find((b) => b.url === original.url);
+    expect(sameUrl).toBeDefined();
+    expect(sameUrl?.dateAdded).toBe(original.dateAdded);
+    expect(sameUrl?.dateModified).toBe(original.dateModified);
+  });
+
   it('produces a checksum that matches our computeChecksum', () => {
     const snapshot = readBookmarks(bookmarksPath, 'chrome');
     writeBookmarks({ bookmarksPath, browserId: 'chrome', profileDir, snapshot, userDataDir });

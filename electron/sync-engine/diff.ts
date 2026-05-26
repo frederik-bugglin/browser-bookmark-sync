@@ -18,6 +18,7 @@ import type {
 export function diffBrowserSnapshot(
   previous: NormalizedSnapshot | null,
   current: NormalizedSnapshot,
+  syncRunAt?: string,
 ): BookmarkChange[] {
   const changes: BookmarkChange[] = [];
   const previousByHash = indexByHash(previous?.bookmarks ?? []);
@@ -27,11 +28,11 @@ export function diffBrowserSnapshot(
   for (const [hash, currentBm] of currentByHash) {
     const prevBm = previousByHash.get(hash);
     if (!prevBm) {
-      changes.push({ kind: 'added', hash, value: currentBm });
+      changes.push({ kind: 'added', hash, value: stampIfMissing(currentBm, syncRunAt) });
       continue;
     }
     if (bookmarksDiffer(prevBm, currentBm)) {
-      changes.push({ kind: 'updated', hash, value: currentBm });
+      changes.push({ kind: 'updated', hash, value: stampIfMissing(currentBm, syncRunAt) });
     }
   }
 
@@ -43,6 +44,17 @@ export function diffBrowserSnapshot(
   }
 
   return changes;
+}
+
+// Chromium does not persist a per-URL date_modified — every bookmark from
+// Chrome/Brave/Edge/Arc comes back with dateModified=null. Without a
+// timestamp the LWW resolver can't pick a winner on merit and falls back
+// to alphabetic browserId order, and the conflict-detail UI shows '—'.
+// Stamping at change-detection time means: if we noticed a difference,
+// the user changed it now — record that.
+function stampIfMissing(bm: NormalizedBookmark, syncRunAt: string | undefined): NormalizedBookmark {
+  if (bm.dateModified || !syncRunAt) return bm;
+  return { ...bm, dateModified: syncRunAt };
 }
 
 export function indexByHash(bookmarks: NormalizedBookmark[]): Map<string, NormalizedBookmark> {

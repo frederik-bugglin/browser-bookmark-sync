@@ -72,6 +72,28 @@ describe('diff', () => {
     expect(diffBrowserSnapshot(previous, current)).toEqual([]);
   });
 
+  it('stamps dateModified on detected changes if the value lacks one (Chromium fallback)', () => {
+    const previous = snapshot([bookmark({ urlNormalized: 'https://a/', title: 'Old' })]);
+    const current = snapshot([
+      bookmark({ urlNormalized: 'https://a/', title: 'New', dateModified: null }),
+    ]);
+    const runAt = '2026-06-01T12:00:00.000Z';
+    const changes = diffBrowserSnapshot(previous, current, runAt);
+    expect(changes.length).toBe(1);
+    expect(changes[0].kind).toBe('updated');
+    expect(changes[0].value.dateModified).toBe(runAt);
+  });
+
+  it('preserves dateModified when the adapter already provided one', () => {
+    const existing = '2026-05-01T10:00:00.000Z';
+    const previous = snapshot([bookmark({ urlNormalized: 'https://a/', title: 'Old' })]);
+    const current = snapshot([
+      bookmark({ urlNormalized: 'https://a/', title: 'New', dateModified: existing }),
+    ]);
+    const changes = diffBrowserSnapshot(previous, current, '2026-06-01T12:00:00.000Z');
+    expect(changes[0].value.dateModified).toBe(existing);
+  });
+
   it('treats folder-path change as add+delete (not update)', () => {
     const previous = snapshot([
       bookmark({ urlNormalized: 'https://a/', folderPath: '/lesezeichenleiste' }),
