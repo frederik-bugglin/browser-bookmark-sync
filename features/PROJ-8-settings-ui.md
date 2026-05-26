@@ -1,6 +1,6 @@
 # PROJ-8: Settings-UI
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-05-06
 **Last Updated:** 2026-05-08
 

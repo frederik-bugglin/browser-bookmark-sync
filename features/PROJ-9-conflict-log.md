@@ -1,6 +1,6 @@
 # PROJ-9: Konflikt-Log
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-05-06
 **Last Updated:** 2026-05-08 (QA-Pass mit zwei Bugs gefixt)
 

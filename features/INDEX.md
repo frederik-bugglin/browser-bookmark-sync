@@ -14,15 +14,15 @@
 
 | ID | Feature | Status | Spec | Created |
 |----|---------|--------|------|---------|
-| PROJ-1 | Electron-Shell und Menüleisten-App | Approved | [PROJ-1-electron-shell.md](PROJ-1-electron-shell.md) | 2026-05-06 |
-| PROJ-2 | Supabase Backend und Auth | Approved | [PROJ-2-supabase-backend.md](PROJ-2-supabase-backend.md) | 2026-05-06 |
-| PROJ-3 | Bookmark-Adapter Chromium-Familie | Approved | [PROJ-3-adapter-chromium.md](PROJ-3-adapter-chromium.md) | 2026-05-06 |
-| PROJ-4 | Bookmark-Adapter Firefox und Zen | Approved | [PROJ-4-adapter-firefox.md](PROJ-4-adapter-firefox.md) | 2026-05-06 |
-| PROJ-5 | Bookmark-Adapter Safari | Approved | [PROJ-5-adapter-safari.md](PROJ-5-adapter-safari.md) | 2026-05-06 |
-| PROJ-6 | Sync-Engine | Approved | [PROJ-6-sync-engine.md](PROJ-6-sync-engine.md) | 2026-05-06 |
-| PROJ-7 | Sync-Trigger (manuell und automatisch) | Approved | [PROJ-7-sync-trigger.md](PROJ-7-sync-trigger.md) | 2026-05-06 |
-| PROJ-8 | Settings-UI | Approved | [PROJ-8-settings-ui.md](PROJ-8-settings-ui.md) | 2026-05-06 |
-| PROJ-9 | Konflikt-Log | Approved | [PROJ-9-conflict-log.md](PROJ-9-conflict-log.md) | 2026-05-06 |
+| PROJ-1 | Electron-Shell und Menüleisten-App | Deployed | [PROJ-1-electron-shell.md](PROJ-1-electron-shell.md) | 2026-05-06 |
+| PROJ-2 | Supabase Backend und Auth | Deployed | [PROJ-2-supabase-backend.md](PROJ-2-supabase-backend.md) | 2026-05-06 |
+| PROJ-3 | Bookmark-Adapter Chromium-Familie | Deployed | [PROJ-3-adapter-chromium.md](PROJ-3-adapter-chromium.md) | 2026-05-06 |
+| PROJ-4 | Bookmark-Adapter Firefox und Zen | Deployed | [PROJ-4-adapter-firefox.md](PROJ-4-adapter-firefox.md) | 2026-05-06 |
+| PROJ-5 | Bookmark-Adapter Safari | Deployed | [PROJ-5-adapter-safari.md](PROJ-5-adapter-safari.md) | 2026-05-06 |
+| PROJ-6 | Sync-Engine | Deployed | [PROJ-6-sync-engine.md](PROJ-6-sync-engine.md) | 2026-05-06 |
+| PROJ-7 | Sync-Trigger (manuell und automatisch) | Deployed | [PROJ-7-sync-trigger.md](PROJ-7-sync-trigger.md) | 2026-05-06 |
+| PROJ-8 | Settings-UI | Deployed | [PROJ-8-settings-ui.md](PROJ-8-settings-ui.md) | 2026-05-06 |
+| PROJ-9 | Konflikt-Log | Deployed | [PROJ-9-conflict-log.md](PROJ-9-conflict-log.md) | 2026-05-06 |
 
 <!-- Add features above this line -->
 

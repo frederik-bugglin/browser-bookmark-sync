@@ -1,6 +1,6 @@
 # PROJ-7: Sync-Trigger (manuell und automatisch)
 
-## Status: Approved (mit Vorbehalt)
+## Status: Deployed
 **Created:** 2026-05-06
 **Last Updated:** 2026-05-08 (QA Standard-Tier abgeschlossen, 4 Live-Verifikationspunkte pending)
 

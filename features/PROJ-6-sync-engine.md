@@ -1,6 +1,6 @@
 # PROJ-6: Sync-Engine
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-05-06
 **Last Updated:** 2026-05-08 (Live-Sync gegen Chrome+Firefox+Zen verifiziert, 9 weitere Bugs gefixt, Steady-State stabil, Health 94/100)
 

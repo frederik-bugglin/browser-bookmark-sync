@@ -1,6 +1,6 @@
 # PROJ-1: Electron-Shell und Menüleisten-App
 
-## Status: In Review
+## Status: Deployed
 **Created:** 2026-05-06
 **Last Updated:** 2026-05-06
 
