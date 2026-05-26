@@ -134,14 +134,16 @@ function firefoxDriver(
       if (!detected.installed) return { browserId, reason: 'not-installed' };
       if (!detected.hasDefaultProfile) return { browserId, reason: 'no-default-profile' };
       // Re-check live each plan call (see chromium driver for rationale).
-      // Firefox holds a process lock on the profile, and writing while it's
-      // held is destructive.
+      // Firefox holds a process lock on the profile, so writing while it's
+      // held is destructive. Reading is fine: the adapter snapshots
+      // places.sqlite + WAL + SHM to a temp dir before opening the DB.
       const lock = firefox.checkLock(detected.profileDir);
       if (lock.running) {
         return {
           browserId,
-          reason: 'browser-running-write',
-          detail: `${detected.name} holds the profile lock; close it to sync.`,
+          reason: 'eligible',
+          readOnly: true,
+          detail: `${detected.name} is running — read OK via snapshot, write skipped to avoid lock conflict.`,
         };
       }
       return { browserId, reason: 'eligible' };

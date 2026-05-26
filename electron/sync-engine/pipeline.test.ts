@@ -395,6 +395,49 @@ describe('runPipeline', () => {
     expect(chromeBookmarks[0].rootKey).toBe('unfiled');
   });
 
+  it('read-only browser contributes to read but is skipped on write', async () => {
+    const writeSpy = vi.fn();
+    const readOnlyDriver: BrowserDriver = {
+      browserId: 'firefox',
+      plan: () => ({
+        browserId: 'firefox',
+        reason: 'eligible',
+        readOnly: true,
+        detail: 'Firefox is running',
+      }),
+      read: () =>
+        snapshot('firefox', [
+          {
+            id: 'b1',
+            url: 'https://ro.example/',
+            urlNormalized: 'https://ro.example/',
+            title: 'RO',
+            folderPath: '/lesezeichen-symbolleiste',
+            rootKey: 'toolbar',
+            dateAdded: null,
+            dateModified: null,
+          },
+        ]),
+      write: writeSpy,
+    };
+    const cloud = createFakeCloud();
+    const result = await runPipeline({
+      userId: 'user-1',
+      cloud,
+      drivers: [readOnlyDriver],
+      logStore: createLogStore(tmpDir),
+      triggeredBy: 'auto',
+    });
+    expect(result.outcome).toBe('success');
+    expect(writeSpy).not.toHaveBeenCalled();
+    // The read still produced an upsert in the cloud (new bookmark).
+    expect(cloud.upserts.length).toBeGreaterThan(0);
+    // No 'write' phase log was recorded for the read-only browser.
+    expect(
+      result.log.phases.some((p) => p.browserId === 'firefox' && p.phase === 'write'),
+    ).toBe(false);
+  });
+
   it('Skipped run when no browsers are eligible', async () => {
     const ineligibleDriver: BrowserDriver = {
       browserId: 'firefox',

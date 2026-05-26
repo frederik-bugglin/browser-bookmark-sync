@@ -147,6 +147,10 @@ export async function runPipeline(deps: PipelineDeps): Promise<SyncRunResult> {
   // -------- Phase 6: WRITE ADAPTERS --------
   const writeOk = new Set<BrowserId>();
   for (const browserPlan of readableBrowsers) {
+    // Read-only browsers contributed their snapshot during DIFF but must not
+    // be written to (e.g. Firefox while running). Skip silently — the plan
+    // entry already carries the detail string for the run log.
+    if (browserPlan.readOnly) continue;
     const driver = findDriver(activeDrivers, browserPlan.browserId);
     if (!driver) continue;
     const targetSnapshot = projectSnapshotFor(

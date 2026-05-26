@@ -91,6 +91,11 @@ export type BookmarkChange = {
 export type EligibleBrowser = {
   browserId: BrowserId;
   reason: 'eligible';
+  // When true the engine reads the browser but skips the write phase.
+  // Used for adapters that can snapshot a running browser (copy-then-read)
+  // but cannot safely write while the profile lock is held — Firefox/Zen.
+  readOnly?: boolean;
+  detail?: string;
 };
 
 export type IneligibleBrowser = {
