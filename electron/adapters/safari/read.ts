@@ -1,5 +1,12 @@
 import { existsSync } from 'node:fs';
 import plist from 'simple-plist';
+import bplistParser from 'bplist-parser';
+
+// bplist-parser defaults to 32k objects per file; Safari power-user
+// libraries routinely exceed that (one observed case: 1.7 MB plist
+// with > 32k nested dicts). Bumping this single export propagates to
+// simple-plist because both modules share the require-cache instance.
+(bplistParser as unknown as { maxObjectCount: number }).maxObjectCount = 1_000_000;
 import { normalizeUrl } from '../../lib/url-normalize';
 import { READING_LIST_TITLE, ROOT_TO_PATH, SAFARI_TITLE_TO_ROOT } from './mapping';
 import {
