@@ -29,6 +29,15 @@ const PROTOCOL = 'junction';
 let pendingDeepLink: string | null = null;
 let authService: AuthService | null = null;
 
+// Cold-start case: macOS may launch the app with the deep-link URL as a
+// command-line argument (in addition to or instead of firing 'open-url').
+// Capture it here so it gets handled once authService is ready.
+function findDeepLinkInArgv(argv: readonly string[]): string | null {
+  return argv.find((arg) => arg.startsWith(`${PROTOCOL}://`)) ?? null;
+}
+const initialArgvDeepLink = findDeepLinkInArgv(process.argv);
+if (initialArgvDeepLink) pendingDeepLink = initialArgvDeepLink;
+
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
@@ -176,8 +185,13 @@ async function boot(): Promise<void> {
     void handleDeepLink(url);
   }
 
-  app.on('second-instance', () => {
+  app.on('second-instance', (_event, argv) => {
     void windows.showMain();
+    // macOS can deliver the deep-link URL via argv on a second-instance call
+    // when the user clicks junction:// while Junction is already running.
+    // Without this, the magic-link callback would silently drop.
+    const url = findDeepLinkInArgv(argv);
+    if (url) void handleDeepLink(url);
   });
 
   app.on('window-all-closed', () => {
