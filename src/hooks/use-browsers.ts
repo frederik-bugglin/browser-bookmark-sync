@@ -14,12 +14,17 @@ export function useBrowsers(): BrowserStatus[] {
 
   useEffect(() => {
     let cancelled = false;
-    // Cached list for an instant first paint, then a real detection refresh.
+    // Register the subscribe listener FIRST so any 'browsers:changed' broadcast
+    // emitted by refresh() lands in our handler. If subscribe() came after
+    // refresh(), a fast broadcast could slip past an unregistered listener and
+    // leave the post-login first paint empty.
+    const unsub = junction().browsers.subscribe((list) => {
+      if (!cancelled) setBrowsers(list);
+    });
     void junction().browsers.list().then((list) => {
       if (!cancelled) setBrowsers(list);
     });
     void junction().browsers.refresh();
-    const unsub = junction().browsers.subscribe(setBrowsers);
     const onFocus = () => {
       void junction().browsers.refresh();
     };
