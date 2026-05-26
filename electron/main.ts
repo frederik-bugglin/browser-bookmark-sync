@@ -117,23 +117,6 @@ async function boot(): Promise<void> {
   });
   const syncService = new SyncService(syncEngine, authService, settingsStore);
 
-  // Mirror sync state to AppState so Renderer subscribers (popover, header,
-  // tray) see run progress regardless of who triggered the sync (tray click,
-  // renderer IPC, or auto-trigger). 'skipped-offline' is owned by SyncTrigger
-  // and is not overwritten here.
-  syncService.on('change', (state: SyncState) => {
-    if (state.isRunning) {
-      appStateStore.set({ lastSyncStatus: 'running' });
-      return;
-    }
-    if (!state.lastResult) return;
-    const isError = state.lastResult.outcome === 'error';
-    appStateStore.set({
-      lastSyncStatus: isError ? 'error' : 'success',
-      lastSyncAt: new Date().toISOString(),
-    });
-  });
-
   const syncTrigger = new SyncTrigger({
     syncService,
     appStateStore,
@@ -152,8 +135,52 @@ async function boot(): Promise<void> {
     triggerSync: () => syncTrigger.triggerNow(),
   });
 
+  // After every state-changing event (sync done, conflict restored/dismissed),
+  // settle on the right top-level sync status. Errors win over warnings; an
+  // open conflict downgrades a successful sync to 'warning'; everything else
+  // is 'success'. 'skipped-offline' is owned by SyncTrigger.
+  async function reconcileSyncStatus(): Promise<void> {
+    const lastResult = syncService.getState().lastResult;
+    if (!lastResult) return;
+    if (lastResult.outcome === 'error') {
+      appStateStore.set({ lastSyncStatus: 'error' });
+      return;
+    }
+    let openCount = 0;
+    try {
+      openCount = await conflictsService.countOpen();
+    } catch {
+      // Network-bounded count; on failure leave the status at the optimistic
+      // outcome rather than blocking the UI on a transient.
+    }
+    appStateStore.set({ lastSyncStatus: openCount > 0 ? 'warning' : 'success' });
+  }
+
+  // Mirror sync state to AppState so Renderer subscribers (popover, header,
+  // tray) see run progress regardless of who triggered the sync (tray click,
+  // renderer IPC, or auto-trigger). 'skipped-offline' is owned by SyncTrigger
+  // and is not overwritten here.
+  syncService.on('change', (state: SyncState) => {
+    if (state.isRunning) {
+      appStateStore.set({ lastSyncStatus: 'running' });
+      return;
+    }
+    if (!state.lastResult) return;
+    appStateStore.set({ lastSyncAt: new Date().toISOString() });
+    void reconcileSyncStatus();
+  });
+
+  // Restore / Dismiss can drop the open-conflict count to zero; re-evaluate
+  // so a stale 'warning' falls back to 'success' once the user has cleared
+  // every open conflict.
+  conflictsService.on('change', () => {
+    void reconcileSyncStatus();
+  });
+
   // Boot-time prune (best-effort, gated on auth + once-per-day inside service).
   void conflictsService.pruneIfDue();
+  // Boot-time reconcile so a previously-warned state survives a restart.
+  void reconcileSyncStatus();
 
   const windows = new WindowManager(appStateStore);
 

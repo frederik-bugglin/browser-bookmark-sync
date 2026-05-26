@@ -85,6 +85,7 @@ function formatStatusLabel(status: string, lastAt: string | null): string {
   if (status === 'running') return 'Synchronisiert…';
   if (status === 'error') return 'Letzter Sync: Fehler';
   if (status === 'skipped-offline') return 'Offline, Sync pausiert';
+  if (status === 'warning') return 'Konflikte offen';
   if (lastAt) {
     const date = new Date(lastAt);
     const formatted = date.toLocaleString('de-CH', {

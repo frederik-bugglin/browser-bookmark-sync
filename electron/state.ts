@@ -4,6 +4,7 @@ export const SyncStatusSchema = z.enum([
   'idle',
   'running',
   'success',
+  'warning',
   'error',
   'skipped-offline',
 ]);

@@ -1,4 +1,4 @@
-export type SyncStatus = 'idle' | 'running' | 'success' | 'error' | 'skipped-offline';
+export type SyncStatus = 'idle' | 'running' | 'success' | 'warning' | 'error' | 'skipped-offline';
 
 export type AppState = {
   schemaVersion: 1 | 2;

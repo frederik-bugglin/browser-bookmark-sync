@@ -52,6 +52,14 @@ export class ConflictsService extends EventEmitter {
     return countConflictsSince(this.deps.supabaseProvider(), userId, since);
   }
 
+  // Total open conflicts irrespective of "last seen" — drives the sync-status
+  // warning state in the header and tray.
+  async countOpen(): Promise<number> {
+    const auth = this.deps.auth.getStatus();
+    if (auth.state !== 'authenticated') return 0;
+    return countConflictsSince(this.deps.supabaseProvider(), auth.userId, null);
+  }
+
   markSeen(): void {
     this.deps.appStateStore.set({ lastConflictsSeenAt: new Date().toISOString() });
     this.emit('change');

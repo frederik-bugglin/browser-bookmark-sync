@@ -14,6 +14,10 @@ const COPY: Record<SyncStatus, { label: string; tone: string }> = {
   idle: { label: 'Bereit', tone: 'bg-muted text-muted-foreground' },
   running: { label: 'Synchronisiert…', tone: 'bg-primary/10 text-primary' },
   success: { label: 'Aktuell', tone: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' },
+  warning: {
+    label: 'Konflikte offen',
+    tone: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
+  },
   error: { label: 'Fehler', tone: 'bg-destructive/10 text-destructive' },
   'skipped-offline': {
     label: 'Offline',
