@@ -41,6 +41,14 @@ export class WindowManager {
 
   async showMain(): Promise<void> {
     if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+      // If the window currently shows the onboarding (or any other) route,
+      // navigate back to the main route before surfacing it. Without this,
+      // a post-login show-main call would leave the user staring at the
+      // "Mail unterwegs" screen.
+      const targetUrl = rendererURL('');
+      if (this.mainWindow.webContents.getURL() !== targetUrl) {
+        await this.mainWindow.loadURL(targetUrl);
+      }
       this.mainWindow.show();
       this.mainWindow.focus();
       return;
