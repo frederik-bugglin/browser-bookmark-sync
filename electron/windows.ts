@@ -7,10 +7,12 @@ import { isSafeExternalUrl, safeOpenExternal } from './safe-open-external';
 // Allowed origins for in-window navigation. Anything else is blocked; safe
 // http(s) URLs are routed to the user's external browser via shell.openExternal.
 const RENDERER_DEV_ORIGIN = 'http://localhost:3000';
+const RENDERER_PROD_ORIGIN = 'app://-';
 
 function isAllowedInternalUrl(url: string): boolean {
   if (url.startsWith('file://')) return true;
   if (url.startsWith(`${RENDERER_DEV_ORIGIN}/`) || url === RENDERER_DEV_ORIGIN) return true;
+  if (url.startsWith(`${RENDERER_PROD_ORIGIN}/`) || url === RENDERER_PROD_ORIGIN) return true;
   return false;
 }
 

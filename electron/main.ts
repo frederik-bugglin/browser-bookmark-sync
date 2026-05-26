@@ -19,6 +19,11 @@ import { SyncTrigger, createDnsProbe, createElectronNotifier } from './sync-trig
 import { BrowsersService, migrateSettingsV1ToV2 } from './browsers';
 import { ConflictsService } from './conflicts';
 import { installCsp } from './csp';
+import { registerAppProtocolScheme, registerAppProtocolHandler } from './protocol';
+
+// Must run before app.whenReady() — registers the 'app' scheme as
+// standard/secure so the renderer can load via app://-/.
+registerAppProtocolScheme();
 
 const PROTOCOL = 'junction';
 let pendingDeepLink: string | null = null;
@@ -63,6 +68,7 @@ async function handleDeepLink(url: string): Promise<void> {
 async function boot(): Promise<void> {
   await app.whenReady();
 
+  registerAppProtocolHandler();
   installCsp();
 
   if (process.platform === 'darwin') app.dock?.hide();
