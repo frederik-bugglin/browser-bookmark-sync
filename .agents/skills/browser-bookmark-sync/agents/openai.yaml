@@ -1,0 +1,6 @@
+interface:
+  display_name: "Browser Bookmark Sync"
+  short_description: "Repo-specific patterns and workflows for browser-bookmark-sync"
+  default_prompt: "Use the browser-bookmark-sync repo skill to follow existing architecture, testing, and workflow conventions."
+policy:
+  allow_implicit_invocation: true
