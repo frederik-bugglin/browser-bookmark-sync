@@ -9,7 +9,9 @@
   "domains": [
     "typescript",
     "next.js",
-    "react"
+    "react",
+    "electron",
+    "supabase"
   ],
   "suggestedBy": "ecc-tools-repo-analysis",
   "createdAt": "2026-05-29T08:24:41.217Z"
