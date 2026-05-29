@@ -1,0 +1,753 @@
+# Instincts generated from https://github.com/frederik-bugglin/browser-bookmark-sync
+# Generated: 2026-05-29T08:24:41.217Z
+# Version: 2.0
+# NOTE: This file supplements (does not replace) any existing curated instincts.
+# High-confidence manually curated instincts should be preserved alongside these.
+
+---
+id: browser-bookmark-sync-commit-conventional
+trigger: "when writing a commit message"
+confidence: 0.85
+domain: git
+source: repo-analysis
+source_repo: https://github.com/frederik-bugglin/browser-bookmark-sync
+---
+
+# Browser Bookmark Sync Commit Conventional
+
+## Action
+
+Use conventional commit format with prefixes: fix, docs, feat, chore, build
+
+## Evidence
+
+- 52 commits analyzed
+- Detected conventional commit pattern
+- Examples: docs(settings): surface Safari + iCloud lazy-persist caveat, feat(sync): allow read-only sync for running Firefox/Zen
+
+---
+id: browser-bookmark-sync-commit-length
+trigger: "when writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: https://github.com/frederik-bugglin/browser-bookmark-sync
+---
+
+# Browser Bookmark Sync Commit Length
+
+## Action
+
+Write moderate-length commit messages (~62 characters)
+
+## Evidence
+
+- Average commit message length: 62 chars
+- Based on 52 commits
+
+---
+id: browser-bookmark-sync-naming-files
+trigger: "when creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/frederik-bugglin/browser-bookmark-sync
+---
+
+# Browser Bookmark Sync Naming Files
+
+## Action
+
+Use camelCase naming convention
+
+## Evidence
+
+- Analyzed file naming patterns in repository
+- Dominant pattern: camelCase
+
+---
+id: browser-bookmark-sync-import-relative
+trigger: "when importing modules"
+confidence: 0.75
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/frederik-bugglin/browser-bookmark-sync
+---
+
+# Browser Bookmark Sync Import Relative
+
+## Action
+
+Use relative imports for project files
+
+## Evidence
+
+- Import analysis shows relative import pattern
+- Example: import { x } from '../lib/x'
+
+---
+id: browser-bookmark-sync-export-style
+trigger: "when exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/frederik-bugglin/browser-bookmark-sync
+---
+
+# Browser Bookmark Sync Export Style
+
+## Action
+
+Prefer named exports
+
+## Evidence
+
+- Export pattern analysis
+- Dominant style: named
+
+---
+id: browser-bookmark-sync-arch-type-based
+trigger: "when adding new code"
+confidence: 0.8
+domain: architecture
+source: repo-analysis
+source_repo: https://github.com/frederik-bugglin/browser-bookmark-sync
+---
+
+# Browser Bookmark Sync Arch Type Based
+
+## Action
+
+Place code in the appropriate type folder (components/, services/, utils/, etc.)
+
+## Evidence
+
+- Type-based module organization detected
+- Folders: app, components, hooks, lib, test
+
+---
+id: browser-bookmark-sync-test-colocate
+trigger: "when writing tests"
+confidence: 0.85
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/frederik-bugglin/browser-bookmark-sync
+---
+
+# Browser Bookmark Sync Test Colocate
+
+## Action
+
+Place test file next to the source file (e.g., Button.test.tsx next to Button.tsx)
+
+## Evidence
+
+- Colocated test pattern detected
+- Tests live alongside source files
+
+---
+id: browser-bookmark-sync-test-framework
+trigger: "when writing tests"
+confidence: 0.9
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/frederik-bugglin/browser-bookmark-sync
+---
+
+# Browser Bookmark Sync Test Framework
+
+## Action
+
+Use vitest as the test framework
+
+## Evidence
+
+- Test framework detected: vitest
+- File pattern: *.test.ts
+
+---
+id: browser-bookmark-sync-test-naming
+trigger: "when creating a test file"
+confidence: 0.85
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/frederik-bugglin/browser-bookmark-sync
+---
+
+# Browser Bookmark Sync Test Naming
+
+## Action
+
+Name test files using the pattern: *.test.ts
+
+## Evidence
+
+- File pattern: *.test.ts
+- Consistent across test files
+
+---
+id: browser-bookmark-sync-test-mocking
+trigger: "when mocking dependencies in tests"
+confidence: 0.75
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/frederik-bugglin/browser-bookmark-sync
+---
+
+# Browser Bookmark Sync Test Mocking
+
+## Action
+
+Use vi.mock for mocking
+
+## Evidence
+
+- Mocking pattern detected: vi.mock
+- Consistent across test files
+
+---
+id: browser-bookmark-sync-test-types
+trigger: "when planning tests for a feature"
+confidence: 0.7
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/frederik-bugglin/browser-bookmark-sync
+---
+
+# Browser Bookmark Sync Test Types
+
+## Action
+
+Write unit, integration tests to match project standards
+
+## Evidence
+
+- Test types detected: unit, integration
+- Coverage config: no
+
+---
+id: browser-bookmark-sync-workflow-feature-development
+trigger: "when implementing a new feature"
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/frederik-bugglin/browser-bookmark-sync
+---
+
+# Browser Bookmark Sync Workflow Feature Development
+
+## Action
+
+Follow the feature-development workflow:
+1. Add feature implementation
+2. Add tests for feature
+3. Update documentation
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~8x per month
+- Files: electron/adapters/chromium/*, electron/lib/*, electron/adapters/firefox/__fixtures__/*
+
+---
+id: browser-bookmark-sync-workflow-test-driven-development
+trigger: "when adding new functionality"
+confidence: 0.7
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/frederik-bugglin/browser-bookmark-sync
+---
+
+# Browser Bookmark Sync Workflow Test Driven Development
+
+## Action
+
+Follow the test-driven-development workflow:
+1. Write failing test
+2. Implement code to pass test
+3. Refactor if needed
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~4x per month
+- Files: **/*.test.*, **/*.spec.*, src/**/*
+
+---
+id: browser-bookmark-sync-workflow-refactoring
+trigger: "when refactoring code"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/frederik-bugglin/browser-bookmark-sync
+---
+
+# Browser Bookmark Sync Workflow Refactoring
+
+## Action
+
+Follow the refactoring workflow:
+1. Ensure tests pass before refactor
+2. Refactor code structure
+3. Verify tests still pass
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: src/**/*
+
+---
+id: browser-bookmark-sync-workflow-feature-development-with-spec-and-qa-cycle
+trigger: "when doing feature development with spec and qa cycle"
+confidence: 0.7
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/frederik-bugglin/browser-bookmark-sync
+---
+
+# Browser Bookmark Sync Workflow Feature Development With Spec And Qa Cycle
+
+## Action
+
+Follow the feature-development-with-spec-and-qa-cycle workflow:
+1. Write or update the tech design/spec file in features/PROJ-*/
+2. Implement the feature (code, tests, IPC, UI, etc.) across relevant modules
+3. Update features/INDEX.md to reflect status (Planned, Architected, In Progress, Approved)
+4. After QA, add or update a QA report and mark the feature as Approved in features/PROJ-*/ and features/INDEX.md
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~4x per month
+- Files: features/PROJ-*-*.md, features/INDEX.md, electron/adapters/*/
+
+---
+id: browser-bookmark-sync-workflow-bugfix-or-qa-driven-patch-with-regression-test
+trigger: "when doing bugfix or qa driven patch with regression test"
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/frederik-bugglin/browser-bookmark-sync
+---
+
+# Browser Bookmark Sync Workflow Bugfix Or Qa Driven Patch With Regression Test
+
+## Action
+
+Follow the bugfix-or-qa-driven-patch-with-regression-test workflow:
+1. Identify and fix the bug in the relevant code module
+2. Add or update a regression/unit test in the corresponding test file
+3. If applicable, update the relevant feature spec or QA report
+4. Commit referencing the issue/QA context
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~8x per month
+- Files: electron/adapters/*/*.ts, electron/adapters/*/*.test.ts, electron/sync-engine/*.ts
+
+---
+id: browser-bookmark-sync-workflow-docs-and-status-update-cycle
+trigger: "when doing docs and status update cycle"
+confidence: 0.7
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/frederik-bugglin/browser-bookmark-sync
+---
+
+# Browser Bookmark Sync Workflow Docs And Status Update Cycle
+
+## Action
+
+Follow the docs-and-status-update-cycle workflow:
+1. Update or add documentation in docs/ or features/ directories
+2. Update TODO.md or QA walkthroughs with new findings or closed items
+3. Mark features as Deployed/Approved in features/INDEX.md or features/PROJ-*/
+4. Commit with docs(...) or chore(...) prefix
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~4x per month
+- Files: docs/qa/*.md, TODO.md, features/INDEX.md
+
+---
+id: browser-bookmark-sync-workflow-adapter-implementation-or-enhancement
+trigger: "when doing adapter implementation or enhancement"
+confidence: 0.65
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/frederik-bugglin/browser-bookmark-sync
+---
+
+# Browser Bookmark Sync Workflow Adapter Implementation Or Enhancement
+
+## Action
+
+Follow the adapter-implementation-or-enhancement workflow:
+1. Create or update modules under electron/adapters/<browser>/ (types, detect, read, write, mapping, lock, etc.)
+2. Add or update tests in electron/adapters/<browser>/*.test.ts
+3. Update feature spec in features/PROJ-*-adapter-<browser>.md
+4. Update features/INDEX.md to reflect progress/status
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~3x per month
+- Files: electron/adapters/<browser>/*.ts, electron/adapters/<browser>/*.test.ts, features/PROJ-*-adapter-<browser>.md
+
+---
+id: browser-bookmark-sync-workflow-sync-engine-or-pipeline-enhancement
+trigger: "when doing sync engine or pipeline enhancement"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/frederik-bugglin/browser-bookmark-sync
+---
+
+# Browser Bookmark Sync Workflow Sync Engine Or Pipeline Enhancement
+
+## Action
+
+Follow the sync-engine-or-pipeline-enhancement workflow:
+1. Update or add modules under electron/sync-engine/ (pipeline, diff, resolve, drivers, route, etc.)
+2. Add or update tests in electron/sync-engine/*.test.ts
+3. If needed, add or update Supabase migration scripts
+4. Update feature spec in features/PROJ-6-sync-engine.md
+5. Update features/INDEX.md to reflect progress/status
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: electron/sync-engine/*.ts, electron/sync-engine/*.test.ts, supabase/migrations/*.sql
+
+---
+id: browser-bookmark-sync-instinct-file-naming
+trigger: "When creating a new file or renaming an existing file"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: frederik-bugglin/browser-bookmark-sync
+---
+
+# Browser Bookmark Sync Instinct File Naming
+
+## Action
+
+Use camelCase for file names
+
+## Evidence
+
+- Pattern in src/components/app-shell.tsx
+- Pattern in src/app/settings/page.tsx
+
+---
+id: browser-bookmark-sync-instinct-function-naming
+trigger: "When defining a new function"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: frederik-bugglin/browser-bookmark-sync
+---
+
+# Browser Bookmark Sync Instinct Function Naming
+
+## Action
+
+Use camelCase for function names
+
+## Evidence
+
+- Pattern in src/utils/validation.ts
+- Pattern in electron/adapters/chromium/checksum.ts
+
+---
+id: browser-bookmark-sync-instinct-class-naming
+trigger: "When creating a new class"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: frederik-bugglin/browser-bookmark-sync
+---
+
+# Browser Bookmark Sync Instinct Class Naming
+
+## Action
+
+Use PascalCase for class names
+
+## Evidence
+
+- Pattern in src/components/settings-sync-section.tsx
+
+---
+id: browser-bookmark-sync-instinct-constant-naming
+trigger: "When defining a constant"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: frederik-bugglin/browser-bookmark-sync
+---
+
+# Browser Bookmark Sync Instinct Constant Naming
+
+## Action
+
+Use SCREAMING_SNAKE_CASE for constant names
+
+## Evidence
+
+- Pattern in src/components/sync-status-pill.tsx
+
+---
+id: browser-bookmark-sync-instinct-relative-imports
+trigger: "When importing modules within the codebase"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: frederik-bugglin/browser-bookmark-sync
+---
+
+# Browser Bookmark Sync Instinct Relative Imports
+
+## Action
+
+Use relative import paths
+
+## Evidence
+
+- Pattern in src/components/app-shell.tsx
+- Pattern in electron/adapters/chromium/checksum.ts
+
+---
+id: browser-bookmark-sync-instinct-named-exports
+trigger: "When exporting functions, classes, or constants"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: frederik-bugglin/browser-bookmark-sync
+---
+
+# Browser Bookmark Sync Instinct Named Exports
+
+## Action
+
+Use named exports instead of default exports
+
+## Evidence
+
+- Pattern in src/utils/validation.ts
+- Pattern in electron/adapters/chromium/detect.ts
+
+---
+id: browser-bookmark-sync-instinct-test-location
+trigger: "When adding tests for a module"
+confidence: 0.9
+domain: testing
+source: repo-analysis
+source_repo: frederik-bugglin/browser-bookmark-sync
+---
+
+# Browser Bookmark Sync Instinct Test Location
+
+## Action
+
+Colocate test files (*.test.ts) next to the implementation file
+
+## Evidence
+
+- Pattern in electron/adapters/chromium/checksum.test.ts
+- Pattern in src/utils/validation.test.ts
+
+---
+id: browser-bookmark-sync-instinct-test-naming
+trigger: "When naming a test file"
+confidence: 0.9
+domain: testing
+source: repo-analysis
+source_repo: frederik-bugglin/browser-bookmark-sync
+---
+
+# Browser Bookmark Sync Instinct Test Naming
+
+## Action
+
+Use the pattern *.test.ts
+
+## Evidence
+
+- Pattern in electron/adapters/chromium/checksum.test.ts
+- Pattern in src/utils/validation.test.ts
+
+---
+id: browser-bookmark-sync-instinct-test-framework
+trigger: "When writing tests"
+confidence: 0.9
+domain: testing
+source: repo-analysis
+source_repo: frederik-bugglin/browser-bookmark-sync
+---
+
+# Browser Bookmark Sync Instinct Test Framework
+
+## Action
+
+Use the Vitest framework with vi.mock for mocking
+
+## Evidence
+
+- Pattern in vitest.config.ts
+- Pattern in electron/adapters/chromium/checksum.test.ts
+
+---
+id: browser-bookmark-sync-instinct-test-types
+trigger: "When designing tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: frederik-bugglin/browser-bookmark-sync
+---
+
+# Browser Bookmark Sync Instinct Test Types
+
+## Action
+
+Write both unit and integration tests as appropriate
+
+## Evidence
+
+- Pattern in electron/adapters/chromium/checksum.test.ts
+- Pattern in electron/sync-engine/*.test.ts
+
+---
+id: browser-bookmark-sync-instinct-commit-format
+trigger: "When writing a commit message"
+confidence: 0.9
+domain: git
+source: repo-analysis
+source_repo: frederik-bugglin/browser-bookmark-sync
+---
+
+# Browser Bookmark Sync Instinct Commit Format
+
+## Action
+
+Use Conventional Commits format with type prefix (fix, feat, docs, chore, build), optional scope, and concise message (average ~62 chars)
+
+## Evidence
+
+- docs(settings): surface Safari + iCloud lazy-persist caveat
+- feat(sync): allow read-only sync for running Firefox/Zen
+- fix(sync): stamp dateModified at change-detection so LWW has a timestamp
+
+---
+id: browser-bookmark-sync-instinct-feature-development-with-spec-and-qa-cycle
+trigger: "When someone wants to add a major feature or component (e.g., adapter, sync engine, conflict log, settings UI, sync trigger)"
+confidence: 0.98
+domain: workflow
+source: repo-analysis
+source_repo: frederik-bugglin/browser-bookmark-sync
+---
+
+# Browser Bookmark Sync Instinct Feature Development With Spec And Qa Cycle
+
+## Action
+
+Follow the workflow: 1) Write/update tech design/spec in features/PROJ-*/, 2) Implement feature across modules, 3) Update features/INDEX.md status, 4) After QA, update QA report and mark feature as Approved
+
+## Evidence
+
+- Pattern in features/PROJ-*-*.md
+- Pattern in features/INDEX.md
+- Workflow description and commit sequences
+
+---
+id: browser-bookmark-sync-instinct-bugfix-or-qa-driven-patch-with-regression-test
+trigger: "When someone finds a bug during QA or live use and wants to fix it and ensure it doesn't recur"
+confidence: 0.95
+domain: workflow
+source: repo-analysis
+source_repo: frederik-bugglin/browser-bookmark-sync
+---
+
+# Browser Bookmark Sync Instinct Bugfix Or Qa Driven Patch With Regression Test
+
+## Action
+
+1) Fix the bug in relevant module, 2) Add/update regression/unit test, 3) If applicable, update feature spec or QA report, 4) Commit referencing issue/QA context
+
+## Evidence
+
+- Pattern in electron/adapters/*/*.ts
+- Pattern in electron/adapters/*/*.test.ts
+- Pattern in features/PROJ-*-*.md
+- Workflow description and commit sequences
+
+---
+id: browser-bookmark-sync-instinct-docs-and-status-update-cycle
+trigger: "When someone wants to update documentation, reflect new caveats, or mark features as complete"
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: frederik-bugglin/browser-bookmark-sync
+---
+
+# Browser Bookmark Sync Instinct Docs And Status Update Cycle
+
+## Action
+
+1) Update/add documentation in docs/ or features/, 2) Update TODO.md or QA walkthroughs, 3) Mark features as Deployed/Approved in features/INDEX.md or features/PROJ-*/, 4) Commit with docs(...) or chore(...) prefix
+
+## Evidence
+
+- Pattern in docs/qa/*.md
+- Pattern in features/INDEX.md
+- Pattern in TODO.md
+- Workflow description and commit sequences
+
+---
+id: browser-bookmark-sync-instinct-adapter-implementation-or-enhancement
+trigger: "When someone wants to add or improve support for a browser's bookmark format"
+confidence: 0.92
+domain: workflow
+source: repo-analysis
+source_repo: frederik-bugglin/browser-bookmark-sync
+---
+
+# Browser Bookmark Sync Instinct Adapter Implementation Or Enhancement
+
+## Action
+
+1) Create/update modules under electron/adapters/<browser>/, 2) Add/update tests in electron/adapters/<browser>/*.test.ts, 3) Update feature spec in features/PROJ-*-adapter-<browser>.md, 4) Update features/INDEX.md to reflect progress/status
+
+## Evidence
+
+- Pattern in electron/adapters/<browser>/*.ts
+- Pattern in electron/adapters/<browser>/*.test.ts
+- Pattern in features/PROJ-*-adapter-<browser>.md
+- Workflow description and commit sequences
+
+---
+id: browser-bookmark-sync-instinct-sync-engine-or-pipeline-enhancement
+trigger: "When someone wants to add or refine sync pipeline logic, conflict handling, or cloud data flow"
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: frederik-bugglin/browser-bookmark-sync
+---
+
+# Browser Bookmark Sync Instinct Sync Engine Or Pipeline Enhancement
+
+## Action
+
+1) Update/add modules under electron/sync-engine/, 2) Add/update tests in electron/sync-engine/*.test.ts, 3) If needed, add/update Supabase migration scripts, 4) Update feature spec in features/PROJ-6-sync-engine.md, 5) Update features/INDEX.md
+
+## Evidence
+
+- Pattern in electron/sync-engine/*.ts
+- Pattern in supabase/migrations/*.sql
+- Pattern in features/PROJ-6-sync-engine.md
+- Workflow description and commit sequences
+
